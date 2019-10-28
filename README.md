@@ -54,4 +54,13 @@ This file, explaining important directory structure and installation requirement
 
 ### ./.gitignore
 
-This file tells git to ignore compiled files and telemetry output. 
+This file tells git to ignore compiled files and telemetry output.
+
+# How to Run
+
+### Windows
+Open an anaconda terminal
+
+Go to the directory with the ```test_battle.py``` file
+
+Run ```python test_battle.py```
