@@ -40,9 +40,9 @@ class EvergladesEnv(gym.Env):
                 reward[0] = 1 if scores[0] > scores[1] else -1
                 reward[1] = reward[0] * -1 # flip the sign
             # else reward is 0 for a tie
-            print(scores)
+            print(f'scores = {scores}')
         # end status done check
-        print(status)
+        #print(f'status = {status}')
 
         # return state, reward, done, info
         return observations, reward, done, {}
