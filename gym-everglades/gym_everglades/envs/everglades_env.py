@@ -57,6 +57,7 @@ class EvergladesEnv(gym.Env):
         output_dir = kwargs.get('output_dir')
         player_names = kwargs.get('pnames')
         self.debug = kwargs.get('debug',False)
+        self.view = kwargs.get('view', False)
 
         # Input validation
         assert( len(self.players) == 2 ), 'Must have exactly two players' # for now
@@ -74,7 +75,8 @@ class EvergladesEnv(gym.Env):
                 unit_file = unit_file,
                 output_dir = output_dir,
                 pnames = player_names,
-                debug = self.debug
+                debug = self.debug,
+                view = self.view
         )
         
         # Initialize players with selected groups

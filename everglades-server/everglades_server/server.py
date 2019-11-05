@@ -17,6 +17,7 @@ class EvergladesGame:
         map_file = kwargs.get('map_file')
         unit_file = kwargs.get('unit_file')
         self.debug = kwargs.get('debug', False)
+        self.view = kwargs.get('view', False)
         self.player_names = kwargs.get('pnames')
         self.output_dir = kwargs.get('output_dir')
         #config_file = kwargs.get(
@@ -363,9 +364,55 @@ class EvergladesGame:
 
         return scores, status
 
+    def view_state(self):
+        print(f'\t- View turn {self.current_turn} -\n')
+        def battleField_Update(self, node, control):
+            if node == 1:
+                self.battleField[1][0] = control
+            
+            if node == 2:
+                self.battleField[0][1] = control
+
+            if node == 3:
+                self.battleField[1][1] = control
+            
+            if node == 4:
+                self.battleField[2][1] = control
+
+            if node == 5:
+                self.battleField[0][2] = control
+            
+            if node == 6:
+                self.battleField[1][2] = control
+
+            if node == 7:
+                self.battleField[2][2] = control
+            
+            if node == 8:
+                self.battleField[0][3] = control
+
+            if node == 9:
+                self.battleField[1][3] = control
+
+            if node == 10:
+                self.battleField[2][3] = control
+            
+            if node == 11:
+                self.battleField[1][4] = control
+
+        # For each node
+        for i, nidx in enumerate(self.map_key2):
+            battleField_Update(self, self.evgMap.nodes[nidx].ID, self.evgMap.nodes[nidx].controlState)
+
+        print(f'       ({self.battleField[0][1]:>4d}) ({self.battleField[0][2]:>4d}) ({self.battleField[0][3]:>4d})')
+        print(f'      /                    \\')
+        print(f'({self.battleField[1][0]:>4d}) ({self.battleField[1][1]:>4d}) ({self.battleField[1][2]:>4d}) ({self.battleField[1][3]:>4d}) ({self.battleField[1][4]:>4d})')
+        print(f'      \\                    /')
+        print(f'       ({self.battleField[2][1]:>4d}) ({self.battleField[2][2]:>4d}) ({self.battleField[2][3]:>4d})')
+        print(f'\n\n')
 
     def debug_state(self):
-        print(f'Turn {self.current_turn} -----------------------------------------------')
+        print(f'\t - Debug turn {self.current_turn} -\n')
 
         def battleField_Update(self, node, control):
             if node == 1:
@@ -403,51 +450,42 @@ class EvergladesGame:
 
         # For each node
         for i, nidx in enumerate(self.map_key2):
-            #print(f'Node {self.evgMap.nodes[nidx].ID}')
+            print(f'Node {self.evgMap.nodes[nidx].ID}')
 
-            battleField_Update(self, self.evgMap.nodes[nidx].ID, self.evgMap.nodes[nidx].controlState)
-            #print(f'{self.battleField}')
+            print(f'\t{self.evgMap.nodes[nidx].resource}')
 
-            #print(f'\t{self.evgMap.nodes[nidx].resource}')
-
-            #print(f'\t% Controlled: {self.evgMap.nodes[nidx].controlState}')
+            print(f'\t% Controlled: {self.evgMap.nodes[nidx].controlState}')
 
             # Show player information
-            # counts = []
-            # cnt = 0
-            # for gid in self.evgMap.nodes[nidx].groups[0]:
-            #     if self.players[0].groups[gid].moving == False:
-            #         cnt += self.players[0].groups[gid].units[0].count
-            #         counts.append(gid)
+            counts = []
+            cnt = 0
+            for gid in self.evgMap.nodes[nidx].groups[0]:
+                if self.players[0].groups[gid].moving == False:
+                    cnt += self.players[0].groups[gid].units[0].count
+                    counts.append(gid)
 
-            # print(f'\tPlayer 0 units: {cnt}')
-            # for gid in counts:
-            #     print(f'\t\ttype: {self.players[0].groups[gid].units[0].unitType}')
-            #     #print(f'\t\tavg health: {np.average(self.players[0].groups[gid].units[0].unitHealth)}')
-            #     print(f'\t\t{np.floor(self.players[0].groups[gid].units[0].unitHealth)}')
+            print(f'\tPlayer 0 units: {cnt}')
+            for gid in counts:
+                print(f'\t\ttype: {self.players[0].groups[gid].units[0].unitType}')
+                #print(f'\t\tavg health: {np.average(self.players[0].groups[gid].units[0].unitHealth)}')
+                print(f'\t\t{np.floor(self.players[0].groups[gid].units[0].unitHealth)}')
 
-            # counts = []
-            # cnt = 0
-            # for gid in self.evgMap.nodes[nidx].groups[1]:
-            #     if self.players[1].groups[gid].moving == False:
-            #         cnt += self.players[1].groups[gid].units[0].count
-            #         counts.append(gid)
+            counts = []
+            cnt = 0
+            for gid in self.evgMap.nodes[nidx].groups[1]:
+                if self.players[1].groups[gid].moving == False:
+                    cnt += self.players[1].groups[gid].units[0].count
+                    counts.append(gid)
 
-            # print(f'\tPlayer 1 units: {cnt}')
-            # for gid in counts:
-            #     print(f'\t\ttype: {self.players[1].groups[gid].units[0].unitType}')
-            #     #print(f'\t\tavg health: {np.average(self.players[1].groups[gid].units[0].unitHealth)}')
-            #     print(f'\t\t{np.floor(self.players[1].groups[gid].units[0].unitHealth)}')
+            print(f'\tPlayer 1 units: {cnt}')
+            for gid in counts:
+                print(f'\t\ttype: {self.players[1].groups[gid].units[0].unitType}')
+                #print(f'\t\tavg health: {np.average(self.players[1].groups[gid].units[0].unitHealth)}')
+                print(f'\t\t{np.floor(self.players[1].groups[gid].units[0].unitHealth)}')
 
-            #print(f'\n')
+            print(f'\n')
 
-        print(f'       ({self.battleField[0][1]:>4d}) ({self.battleField[0][2]:>4d}) ({self.battleField[0][3]:>4d})')
-        print(f'      /                    \\')
-        print(f'({self.battleField[1][0]:>4d}) ({self.battleField[1][1]:>4d}) ({self.battleField[1][2]:>4d}) ({self.battleField[1][3]:>4d}) ({self.battleField[1][4]:>4d})')
-        print(f'      \\                    /')
-        print(f'       ({self.battleField[2][1]:>4d}) ({self.battleField[2][2]:>4d}) ({self.battleField[2][3]:>4d})')
         print(f'--------------------------------------------------------\n\n')
-
 
 
     def board_state(self, player_num):

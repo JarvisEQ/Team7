@@ -26,6 +26,8 @@ output_dir = './game_telemetry/'
 # 0 for no debug /  1 for debug
 debug = 1
 
+view = 0
+
 ## Specific Imports
 agent0_name, agent0_extension = os.path.splitext(agent0_file)
 agent0_mod = importlib.import_module(agent0_name.replace('/','.'))
@@ -55,7 +57,8 @@ observations = env.reset(
         unit_file = unit_file,
         output_dir = output_dir,
         pnames = names,
-        debug = debug
+        debug = debug,
+        view = view
 )
 
 actions = {}
@@ -65,6 +68,9 @@ done = 0
 while not done:
     if debug:
         env.game.debug_state()
+
+    if view:
+        env.game.view_state()
 
     for pid in players:
         actions[pid] = players[pid].get_action( observations[pid] )
