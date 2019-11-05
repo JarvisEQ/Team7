@@ -18,6 +18,7 @@ class EvergladesGame:
         unit_file = kwargs.get('unit_file')
         self.debug = kwargs.get('debug', False)
         self.view = kwargs.get('view', False)
+        self.createOut = kwargs.get('out', False)
         self.player_names = kwargs.get('pnames')
         self.output_dir = kwargs.get('output_dir')
         #config_file = kwargs.get(
@@ -359,10 +360,11 @@ class EvergladesGame:
         )
         self.output['GAME_Scores'].append(outstr) 
 
-        if status != 0:
+        if status != 0 and self.createOut == 1:
             self.write_output()
 
         return scores, status
+
 
     def view_state(self):
         print(f'\t- View turn {self.current_turn} -\n')

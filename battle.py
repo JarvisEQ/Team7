@@ -24,9 +24,11 @@ unit_file = config_dir + 'UnitDefinitions.json'
 output_dir = './game_telemetry/'
 
 # 0 for no debug /  1 for debug
-debug = 1
+debug = 0
 
-view = 0
+view = 1
+
+createOut = 0
 
 ## Specific Imports
 agent0_name, agent0_extension = os.path.splitext(agent0_file)
@@ -58,7 +60,8 @@ observations = env.reset(
         output_dir = output_dir,
         pnames = names,
         debug = debug,
-        view = view
+        view = view,
+        out = createOut
 )
 
 actions = {}
