@@ -841,6 +841,7 @@ class EvergladesGame:
                         if self.players[pid].groups[gid].moving == False:
                             ctr += 1
                             count = self.players[pid].groups[gid].units[0].count
+                            # how much control a unit type has
                             xer = self.players[pid].groups[gid].units[0].definition.control
                             points[pid] += count * xer 
                     if ctr >= 1:
@@ -934,7 +935,7 @@ class EvergladesGame:
 
     def build_knowledge_output(self):
         players = np.array( list(self.players.keys()) )
-
+        
         for pid in self.team_starts:
             opp_pid = np.where( players != pid )[0][0]
             knowledge = [0 for i in self.map_key2]
