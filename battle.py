@@ -24,9 +24,9 @@ unit_file = config_dir + 'UnitDefinitions.json'
 output_dir = './game_telemetry/'
 
 # 0 for no debug /  1 for debug
-debug = 0
+debug = 1
 
-view = 1
+view = 0
 
 createOut = 0
 

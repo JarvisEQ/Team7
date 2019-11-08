@@ -367,7 +367,7 @@ class EvergladesGame:
 
 
     def view_state(self):
-        print(f'\t- View turn {self.current_turn} -\n')
+        print(f'\t - View turn {self.current_turn} -\n')
         def battleField_Update(self, node, control):
             if node == 1:
                 self.battleField[1][0] = control
