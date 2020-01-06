@@ -6,6 +6,7 @@ import gym_everglades
 import pdb
 
 import numpy as np
+import random as r
 
 from everglades_server import server
 
@@ -23,7 +24,11 @@ unit_file = config_dir + 'UnitDefinitions.json'
 output_dir = './game_telemetry/'
 
 # 0 for no debug /  1 for debug
-debug = 0
+debug = 1
+
+view = 0
+
+createOut = 0
 
 ## Specific Imports
 agent0_name, agent0_extension = os.path.splitext(agent0_file)
@@ -41,7 +46,7 @@ names = {}
 
 # Inputs for the dqn agent are:
 # state size, actions, player #, seed
-players[0] = agent0_class(105, env.num_actions_per_turn, 0, 1)
+players[0] = agent0_class(105, env.num_actions_per_turn, 0, r.random() * 100)
 names[0] = agent0_class.__name__
 
 players[1] = agent1_class(env.num_actions_per_turn, 1)
@@ -54,7 +59,9 @@ observations = env.reset(
         unit_file = unit_file,
         output_dir = output_dir,
         pnames = names,
-        debug = debug
+        debug = debug,
+        view = view,
+        out = createOut
 )
 
 actions = {}
@@ -64,6 +71,9 @@ done = 0
 while not done:
     if debug:
         env.game.debug_state()
+
+    if view:
+        env.game.view_state()
 
     for pid in players:
         actions[pid] = players[pid].get_action( observations[pid] )
