@@ -11,7 +11,7 @@ from collections import deque
 import time
 import random
 import os
-import sys
+import tqdm
 from PIL import Image
 import cv2
 
@@ -223,7 +223,8 @@ reward_history = []
 
 
 # run for number of episodes
-for episode in range(EPISODES):
+for episode in tqdm(range(1, EPISODES+1), ascii=True, unit="episode"):
+    
     episode_loss = 0
     episode_reward = 0
     state = env.reset()
