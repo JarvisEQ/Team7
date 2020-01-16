@@ -1,15 +1,17 @@
 import numpy as np
-import keras.backend.tensorflow_backend as backend
-from keras.models import Sequential
-from keras.layers import Dense, Dropout, Conv2D, MaxPooling2D, Activation, Flatten
-from keras.optimizers import Adam
-from keras.callbacks import TensorBoard
-import tensorflow as tf
+
+# torch
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+from torch.autograd import Variable
+
 from collections import deque
 import time
 import random
-from tqdm import tqdm
 import os
+import sys
 from PIL import Image
 import cv2
 
@@ -25,7 +27,7 @@ MEMORY_FRACTION = 0.20
 LEARNING_RATE = 0.0000625
 
 # Environment settings
-EPISODES = 50_000
+EPISODES = 50
 
 # Exploration settings
 epsilon = 1  # not a constant, going to be decayed
@@ -34,7 +36,73 @@ MIN_EPSILON = 0.001
 
 #  Stats settings
 AGGREGATE_STATS_EVERY = 50  # episodes
-SHOW_PREVIEW = False
+SHOW_PREVIEW = True
+
+# all hail the blob
+class Blob:
+    def __init__(self, size):
+        self.size = size
+        self.x = np.random.randint(0, size)
+        self.y = np.random.randint(0, size)
+
+    def __str__(self):
+        return f"Blob ({self.x}, {self.y})"
+
+    def __sub__(self, other):
+        return (self.x-other.x, self.y-other.y)
+
+    def __eq__(self, other):
+        return self.x == other.x and self.y == other.y
+
+    def action(self, choice):
+        '''
+        Gives us 9 total movement options. (0,1,2,3,4,5,6,7,8)
+        '''
+        if choice == 0:
+            self.move(x=1, y=1)
+        elif choice == 1:
+            self.move(x=-1, y=-1)
+        elif choice == 2:
+            self.move(x=-1, y=1)
+        elif choice == 3:
+            self.move(x=1, y=-1)
+
+        elif choice == 4:
+            self.move(x=1, y=0)
+        elif choice == 5:
+            self.move(x=-1, y=0)
+
+        elif choice == 6:
+            self.move(x=0, y=1)
+        elif choice == 7:
+            self.move(x=0, y=-1)
+
+        elif choice == 8:
+            self.move(x=0, y=0)
+
+    def move(self, x=False, y=False):
+
+        # If no value for x, move randomly
+        if not x:
+            self.x += np.random.randint(-1, 2)
+        else:
+            self.x += x
+
+        # If no value for y, move randomly
+        if not y:
+            self.y += np.random.randint(-1, 2)
+        else:
+            self.y += y
+
+        # If we are out of bounds, fix!
+        if self.x < 0:
+            self.x = 0
+        elif self.x > self.size-1:
+            self.x = self.size-1
+        if self.y < 0:
+            self.y = 0
+        elif self.y > self.size-1:
+            self.y = self.size-1
 
 class BlobEnv:
     SIZE = 10
@@ -102,7 +170,7 @@ class BlobEnv:
         cv2.imshow("image", np.array(img))  # show it!
         cv2.waitKey(1)
 
-    # FOR CNN #
+    # FOR CNN #         
     def get_image(self):
         env = np.zeros((self.SIZE, self.SIZE, 3), dtype=np.uint8)  # starts an rbg of our size
         env[self.food.x][self.food.y] = self.d[self.FOOD_N]  # sets the food location tile to green color
@@ -112,15 +180,6 @@ class BlobEnv:
         return img
 
 
-env = BlobEnv()
-
-# For stats
-ep_rewards = [-200]
-
-# For more repetitive results
-random.seed(1)
-np.random.seed(1)
-tf.set_random_seed(1)
 
 # Memory fraction, used mostly when trai8ning multiple agents
 #gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=MEMORY_FRACTION)
@@ -130,238 +189,95 @@ tf.set_random_seed(1)
 if not os.path.isdir('models'):
     os.makedirs('models')
 
-class DQNAgent:
+class Policy(nn.Module):
     
     def __init__(self):
+        super(Policy, self).__init__()
+        
 
-        # main model, optimise on this one
-        self.model = self.create_model()
-        
-        # target model, use .predict on this one
-        self.target_model = self.create_model()
-        self.target_model.set_weights(self.model.get_weights())
-        
-        self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
-        
-        self.tensorboard = ModifiedTensorBoard(log_dir="logs/{}-{}".format(MODEL_NAME, int(time.time())))
-
-        self.target_update_counter = 0
-
-    def create_model(self):
-        model = Sequential()
-        
-        # first convolution
-        model.add(Conv2D(256, (3,3), input_shape=env.OBSERVATION_SPACE_VALUES))
-        model.add(Activation("relu"))
-        model.add(MaxPooling2D(2,2))
-        model.add(Dropout(0.2))
-        
-        # Second Convolution
-        model.add(Conv2D(256, (3,3)))
-        model.add(Activation("relu"))
-        model.add(MaxPooling2D(2,2))
-        model.add(Dropout(0.2))
-
-        # Two dense layers mapped to action space
-        model.add(Flatten())
-        model.add(Dense(64))
-        model.add(Activation("relu"))
-        model.add(Dense(64))
-        model.add(Dense(env.ACTION_SPACE_SIZE, activation='linear'))
-        model.compile(loss="mse", optimizer=Adam(lr=LEARNING_RATE), metrics=['accuracy'])
-        
-        return model
-        
-    def update_replay_memory(self, transition):
-        self.replay_memory.append(transition)
-        
-    def get_qs(self, state):
-        return self.model.predict(np.array(state).reshape(-1, *state.shape)/255)[0]
+        # fc layers to outputs
+        self.fc0 = nn.Linear(300, 128)
+        self.fc1 = nn.Linear(128, 64)
+        self.fc2 = nn.Linear(64, env.ACTION_SPACE_SIZE)
     
-    def train(self, terminal_state, state):
+    def forward(self, x):
         
-        # testing to make sure the replay_memory is large enough 
-        if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
-            return 
-        minibatch = random.sample(self.replay_memory, MINIBATCH_SIZE)
-        
-        current_state = np.array([transition[0] for transition in minibatch])/255
-        current_qs_list = self.model.predict(current_state)
-        
-        new_current_state = np.array([transition[3] for transition in minibatch])/255
-        future_qs_list = self.target_model.predict(new_current_state)
-        
-        x = []
-        y = []
-        
-        for index, (current_state, action, reward, new_current_state, done) in enumerate(minibatch):
-            if not done:
-                max_future_q = np.max(future_qs_list[index])
-                new_q = reward + DISCOUNT * max_future_q
-            else:
-                new_q = reward 
-            
-            current_qs = current_qs_list[index]
-            current_qs[action] = new_q
-            
-            x.append(current_state)
-            y.append(current_qs)
-            
-        self.model.fit(np.array(x)/255, np.array(y), batch_size = MINIBATCH_SIZE,
-                       verbose=0, shuffle=False, callbacks=[self.tensorboard] if terminal_state else None)
-        
-        # if target needs to be updated 
-        if terminal_state:
-            self.target_update_counter += 1
-            
-        if self.target_update_counter > UPDATE_TARGET_EVERY:
-            self.target_model.set_weights(self.model.get_weights())
-            self.target_update_counter = 0
-        
-        
-# this is an optimisation to lower the amount of IO ops tensorboard does
-class ModifiedTensorBoard(TensorBoard):
+        x = torch.flatten(x)
+        x = F.relu(self.fc0(x))
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        return x
 
-    # Overriding init to set initial step and writer (we want one log file for all .fit() calls)
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.step = 1
-        self.writer = tf.summary.FileWriter(self.log_dir)
+env = BlobEnv()
 
-    # Overriding this method to stop creating default log writer
-    def set_model(self, model):
-        pass
+# For stats
+ep_rewards = [-200]
 
-    # Overrided, saves logs with our step number
-    # (otherwise every .fit() will start writing from 0th step)
-    def on_epoch_end(self, epoch, logs=None):
-        self.update_stats(**logs)
+# agent and other stuff 
+policy = Policy()
+loss_fn = nn.MSELoss()
+optimizer = optim.Adam(policy.parameters(), lr=LEARNING_RATE)
 
-    # Overrided
-    # We train for one batch only, no need to save anything at epoch end
-    def on_batch_end(self, batch, logs=None):
-        pass
-
-    # Overrided, so won't close writer
-    def on_train_end(self, _):
-        pass
-
-    # Custom method for saving own metrics
-    # Creates writer, writes custom metrics and closes writer
-    def update_stats(self, **stats):
-        self._write_logs(stats, self.step)
-        
-# all hail the blob
-class Blob:
-    def __init__(self, size):
-        self.size = size
-        self.x = np.random.randint(0, size)
-        self.y = np.random.randint(0, size)
-
-    def __str__(self):
-        return f"Blob ({self.x}, {self.y})"
-
-    def __sub__(self, other):
-        return (self.x-other.x, self.y-other.y)
-
-    def __eq__(self, other):
-        return self.x == other.x and self.y == other.y
-
-    def action(self, choice):
-        '''
-        Gives us 9 total movement options. (0,1,2,3,4,5,6,7,8)
-        '''
-        if choice == 0:
-            self.move(x=1, y=1)
-        elif choice == 1:
-            self.move(x=-1, y=-1)
-        elif choice == 2:
-            self.move(x=-1, y=1)
-        elif choice == 3:
-            self.move(x=1, y=-1)
-
-        elif choice == 4:
-            self.move(x=1, y=0)
-        elif choice == 5:
-            self.move(x=-1, y=0)
-
-        elif choice == 6:
-            self.move(x=0, y=1)
-        elif choice == 7:
-            self.move(x=0, y=-1)
-
-        elif choice == 8:
-            self.move(x=0, y=0)
-
-    def move(self, x=False, y=False):
-
-        # If no value for x, move randomly
-        if not x:
-            self.x += np.random.randint(-1, 2)
-        else:
-            self.x += x
-
-        # If no value for y, move randomly
-        if not y:
-            self.y += np.random.randint(-1, 2)
-        else:
-            self.y += y
-
-        # If we are out of bounds, fix!
-        if self.x < 0:
-            self.x = 0
-        elif self.x > self.size-1:
-            self.x = self.size-1
-        if self.y < 0:
-            self.y = 0
-        elif self.y > self.size-1:
-            self.y = self.size-1
+loss_history = []
+reward_history = []
 
 
-agent = DQNAgent()
-
-for episode in tqdm(range(1, EPISODES+1), ascii=True, unit="episode"):
-    
-    agent.tensorboard.step = episode
-    
+# run for number of episodes
+for episode in range(EPISODES):
+    episode_loss = 0
     episode_reward = 0
-    step = 1
-    current_state = env.reset()
-    
+    state = env.reset()
     done = False
     
     while not done:
-        if np.random.random() > epsilon:
-            action = np.argmax(agent.get_qs(current_state))
+        
+        # Get first Q action value function
+        Q = policy(Variable(torch.from_numpy(state).type(torch.FloatTensor)))
+        
+        # Choose epsilon-greedy action
+        if np.random.rand(1) < epsilon:
+            action = np.random.randint(0,3)
         else:
-            action = np.random.randint(0, env.ACTION_SPACE_SIZE)
-    
-        new_state, reward, done = env.step(action)
+            _, action = torch.max(Q, -1)
+            action = action.item()
         
+        # Step forward and receive next state and reward
+        next_state, reward, done = env.step(action)
+
+        current_position = next_state[0]
+        
+        # Find the max Q action value for the next state
+        Qs = policy(Variable(torch.from_numpy(next_state).type(torch.FloatTensor)))
+        next_Q, _ = torch.max(Qs, -1)
+        
+        # Create target Q value for training the policy
+        Q_target = Q.clone()
+        Q_target = Variable(Q_target.data)
+        Q_target[action] = reward + torch.mul(next_Q.detach(), DISCOUNT)
+        
+        # Calculate loss
+        loss = loss_fn(Q, Q_target)
+        
+        # Update policy using gradient descent
+        policy.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # Record history
+        episode_loss += loss.item()
         episode_reward += reward
-        
-        if SHOW_PREVIEW and not episode % AGGREGATE_STATS_EVERY:
-            env.render()
+
+
+        if done:
             
-        agent.update_replay_memory((current_state, action, reward, new_state, done))
-        agent.train(done, step)
-        
-        current_state = new_state
-        step += 1
-    
-    # Append episode reward to a list and log stats (every given number of episodes)
-    ep_rewards.append(episode_reward)
-    if not episode % AGGREGATE_STATS_EVERY or episode == 1:
-        average_reward = sum(ep_rewards[-AGGREGATE_STATS_EVERY:])/len(ep_rewards[-AGGREGATE_STATS_EVERY:])
-        min_reward = min(ep_rewards[-AGGREGATE_STATS_EVERY:])
-        max_reward = max(ep_rewards[-AGGREGATE_STATS_EVERY:])
-        agent.tensorboard.update_stats(reward_avg=average_reward, reward_min=min_reward, reward_max=max_reward, epsilon=epsilon)
+            print(f"Reward for episode {episode} is {reward}")
+            # Adjust epsilon
+            epsilon *= EPSILON_DECAY
 
-        # Save model, but only when min reward is greater or equal a set value
-        if min_reward >= MIN_REWARD:
-            agent.model.save(f'models/{MODEL_NAME}__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
+            # Document loss, reward, and the car's current position
+            loss_history.append(episode_loss)
+            reward_history.append(episode_reward)
 
-    # Decay epsilon
-    if epsilon > MIN_EPSILON:
-        epsilon *= EPSILON_DECAY
-        epsilon = max(MIN_EPSILON, epsilon)
+            break
+        else:
+            state = next_state
