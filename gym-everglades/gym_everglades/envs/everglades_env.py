@@ -40,9 +40,9 @@ class EvergladesEnv(gym.Env):
                 reward[0] = 1 if scores[0] > scores[1] else -1
                 reward[1] = reward[0] * -1 # flip the sign
             # else reward is 0 for a tie
-            print(scores)
+            print(f'scores = {scores}')
         # end status done check
-        print(status)
+        #print(f'status = {status}')
 
         # return state, reward, done, info
         return observations, reward, done, {}
@@ -57,6 +57,8 @@ class EvergladesEnv(gym.Env):
         output_dir = kwargs.get('output_dir')
         player_names = kwargs.get('pnames')
         self.debug = kwargs.get('debug',False)
+        self.view = kwargs.get('view', False)
+        self.createOut = kwargs.get('out', False)
 
         # Input validation
         assert( len(self.players) == 2 ), 'Must have exactly two players' # for now
@@ -74,7 +76,9 @@ class EvergladesEnv(gym.Env):
                 unit_file = unit_file,
                 output_dir = output_dir,
                 pnames = player_names,
-                debug = self.debug
+                debug = self.debug,
+                view = self.view,
+                out = self.createOut
         )
         
         # Initialize players with selected groups
