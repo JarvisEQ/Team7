@@ -18,13 +18,14 @@ import random as r
 
 from everglades_server import server
 
-## Input Variables
-# Agent files must include a class of the same name with a 'get_action' function
-# Do not include './' in file path
-agent0_file = 'agents/dqn.py'
-#agent1_file = 'agents/same_commands.py'
-agent1_file = 'agents/random_actions.py'
+# Hyperparameters
+LEARNING_RATE = 0.00065
+epsilon = 0.99
+EPSILON_DECAY = 0.00025
+NUM_EPISODES = 5
+TARGET_UPDATE = 10
 
+## Input Variables
 config_dir = './config/'
 map_file = config_dir + 'DemoMap.json'
 setup_file = config_dir + 'GameSetup.json'
@@ -38,27 +39,8 @@ view = 0
 
 createOut = 0
 
-## Specific Imports
-agent0_name, agent0_extension = os.path.splitext(agent0_file)
-agent0_mod = importlib.import_module(agent0_name.replace('/','.'))
-agent0_class = getattr(agent0_mod, os.path.basename(agent0_name))
-
-agent1_name, agent1_extension = os.path.splitext(agent1_file)
-agent1_mod = importlib.import_module(agent1_name.replace('/','.'))
-agent1_class = getattr(agent1_mod, os.path.basename(agent1_name))
-
 ## Main Script
 env = gym.make('everglades-v0')
-players = {}
-names = {}
-
-# Inputs for the dqn agent are:
-# state size, actions, player #, seed
-players[0] = agent0_class(105, env.num_actions_per_turn, 0, r.random() * 100)
-names[0] = agent0_class.__name__
-
-players[1] = agent1_class(env.num_actions_per_turn, 1)
-names[1] = agent1_class.__name__
 
 # defining policy
 class Policy(nn.Module):
@@ -67,10 +49,12 @@ class Policy(nn.Module):
         super(Policy, self).__init__()
         
         # fc layers to outputs
+        # TODO get the proper observations space and flatten it
         self.fc0 = nn.Linear(69, 128)
         self.fc1 = nn.Linear(128, 64)
         self.fc2 = nn.Linear(64, env.num_actions_per_turn)
-    
+        # TODO find the proper way to make the output
+        
     def forward(self, x):
         
         x = torch.flatten(x)
@@ -78,13 +62,21 @@ class Policy(nn.Module):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         return x
-    
 
+# make the networks
+policy = Policy()
+target_policy = Policy()
+target_policy.load_state_dict(policy.state_dict())
 
-for _ in tqdm(range(5), ascii=True, unit="episode"):
+# loss and optimiser
+loss = nn.MSELoss()
+opti = optim.Adam(policy.parameters(), lr=LEARNING_RATE)
+
+# training loop
+for episode in tqdm(range(NUM_EPISODES), ascii=True, unit="episode"):
     
     observations = env.reset(
-            players=players,
+            players=players,        # TODO find out what to put here
             config_dir = config_dir,
             map_file = map_file,
             unit_file = unit_file,
@@ -97,19 +89,56 @@ for _ in tqdm(range(5), ascii=True, unit="episode"):
 
     actions = {}
 
-    ## Game Loop
+    # Game Loop
+    # TODO, finish this
     done = 0
     while not done:
-        if debug:
-            env.game.debug_state()
 
-        if view:
-            env.game.view_state()
-
-        for pid in players:
-            actions[pid] = players[pid].get_action( observations[pid] )
-
+        # get Q from policy
+        Q = policy(Variable(torch.from_numpy(observations[0]).type(torch.FloatTensor)))
+        
+        # epsilon-greedy action
+        if np.random(1) < epsilon:
+            
+            # random actions 
+            actionDQN = np.zeros(self.shape)
+            actionDQN[:, 0] = np.random.choice(self.num_groups, self.num_actions, replace=False)
+            actionDQN[:, 1] = np.random.choice(np.arange(1, self.num_nodes + 1), self.num_actions, replace=False)
+        else:
+            continue
+            # action based on Qs
+        
+        # get random actions as our random agent
+        actionRAN = np.zeros(self.shape)
+        actionRAN[:, 0] = np.random.choice(self.num_groups, self.num_actions, replace=False)
+        actionRAN[:, 1] = np.random.choice(np.arange(1, self.num_nodes + 1), self.num_actions, replace=False)
+        
+        # wrap the actions up
+        actions = [actionDQN, actionRAN]
+        
+        # do one step
         observations, reward, done, info = env.step(actions)
         
+        # get next set of Qs
+        Q_new = policy(Variable(torch.from_numpy(observations[0]).type(torch.FloatTensor)))
         
-    print(f"reward = {reward}")
+        # create target Qs
+        
+        # update policy 
+        
+        # end of episode 
+        if done:
+            
+            # print reward for this episode
+            print(f"reward = {reward}")
+            
+            # decay epsilon
+            epsilon *= EPSILON_DECAY
+            
+            # copy weights to target if applicable
+            if episode % TARGET_UPDATE:
+                target_policy.load_state_dict(policy.state_dict())
+            
+            # end episode
+            break
+    
