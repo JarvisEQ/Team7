@@ -37,7 +37,36 @@ debug = 0
 
 view = 0
 
-createOut = 0
+createOut = 1
+
+# used for making help us decide actions from Qs
+NODE_CONNECTIONS = {
+    1: [2, 4, -1, -1, -1],
+    2: [1, 3, 5, -1, -1],
+    3: [2, 4, 5, 6, 7],
+    4: [1, 3, 7, -1, -1],
+    5: [2, 3, 8, 9, -1],
+    6: [3, 9, -1, -1, -1],
+    7: [3, 4, 9, 10, -1],
+    8: [5, 9, 11, -1, -1],
+    9: [5, 6, 7, 8, 10],
+    10: [7, 9, 11, -1, -1],
+    11: [8, 10, -1, -1, -1]
+}
+
+GAME_MAP = np.array([
+    2, 4, -1, -1, -1, -1,
+    1, 3, 5, -1, -1, -1,
+    2, 4, 5, 6, 7, -1,
+    1, 3, 7, -1, -1, -1,
+    2, 3, 8, 9, -1, -1,
+    3, 9, -1, -1, -1, -1,
+    3, 4, 9, 10, -1, -1,
+    5, 9, 11, -1, -1, -1,
+    5, 6, 7, 8, 10, -1,
+    7, 9, 11, -1, -1, -1,
+    8, 10, -1, -1, -1, -1])
+
 
 ## Main Script
 env = gym.make('everglades-v0')
@@ -52,8 +81,10 @@ class Policy(nn.Module):
         # TODO get the proper observations space and flatten it
         self.fc0 = nn.Linear(69, 128)
         self.fc1 = nn.Linear(128, 64)
-        self.fc2 = nn.Linear(64, env.num_actions_per_turn)
-        # TODO find the proper way to make the output
+		# 60 possible options for actions for our network
+		# 12 units
+		# 5 connections we can move to, 1 do nothing 
+        self.fc2 = nn.Linear(64, 72)
         
     def forward(self, x):
         
@@ -86,6 +117,7 @@ for episode in tqdm(range(NUM_EPISODES), ascii=True, unit="episode"):
             view = view,
             out = createOut
     )
+    
 
     actions = {}
 
@@ -141,4 +173,37 @@ for episode in tqdm(range(NUM_EPISODES), ascii=True, unit="episode"):
             
             # end episode
             break
+
+# TODO, test this to make sure that it works properly
+# might be good to break this out into a different file as well 
+# expects a numpy array of size 72 and state of size 105
+def Q_to_Actions(Qs, state):
+    
+    actions_for_env = []
+    
+    # get 7 actions
+    for index in range(7):
+        
+        # get the max Q
+        action = np.argmax(Qs)
+        
+        # set that Q low so we don't choose it again
+        Qs[action] = -420.0
+        
+        # get the unit we want to map to 
+        unit = action/6
+        to_node = action%6
+        
+        # get the node we want to look at
+        state_index = (unit * 5) + 45
+        node = state[state_index]
+        
+        # compare to map
+        to_node = NODE_CONNECTIONS[(node*6) + to_node]
+        
+        # append it to the array 
+        actions_for_env.append([unit, to_node])
+
+    return actions_for_env
+    
     
