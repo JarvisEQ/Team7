@@ -44,7 +44,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class dqn:
     """Interacts with and learns from the environment."""
 
-    def __init__(self, state_size, action_size, player_num, seed):
+    def __init__(self, state_size, action_size, seed):
         """
         Initialize an Agent object.
 
@@ -298,10 +298,12 @@ def train_dqn(env, agent, n_episodes=2000, max_t=200, eps_start=1.0, eps_end=0.0
         eps_decay (float): multiplicative factor (per episode) for decreasing epsilon
     """
     scores_deque = deque(maxlen=100)   # last 100 scores
-    eps = eps_start                    # initialize epsilon
+    eps = eps_start      
+                  # initialize epsilon
     for i_episode in range(1, n_episodes+1):
         state = env.reset()
         score = 0
+        
         for t in range(max_t):
             actions = agent.act(state, eps)
             # print(actions)

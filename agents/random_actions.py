@@ -3,7 +3,7 @@ import numpy as np
 import time
 
 class random_actions:
-    def __init__(self, action_space, player_num):
+    def __init__(self, action_space):
         self.action_space = action_space
         self.num_groups = 12
 
