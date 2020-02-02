@@ -17,13 +17,17 @@ import numpy as np
 import random as r
 
 from everglades_server import server
+from helpers.getActions import getActions
 
 # Hyperparameters
-LEARNING_RATE = 0.00065
+LEARNING_RATE = 0.00069
 epsilon = 0.99
 EPSILON_DECAY = 0.00025
 NUM_EPISODES = 5
 TARGET_UPDATE = 10
+ACTION_SPACE = 72
+STATE_SPACE = 105
+
 
 ## Input Variables
 config_dir = './config/'
@@ -37,36 +41,7 @@ debug = 0
 
 view = 0
 
-createOut = 1
-
-# used for making help us decide actions from Qs
-NODE_CONNECTIONS = {
-    1: [2, 4, -1, -1, -1],
-    2: [1, 3, 5, -1, -1],
-    3: [2, 4, 5, 6, 7],
-    4: [1, 3, 7, -1, -1],
-    5: [2, 3, 8, 9, -1],
-    6: [3, 9, -1, -1, -1],
-    7: [3, 4, 9, 10, -1],
-    8: [5, 9, 11, -1, -1],
-    9: [5, 6, 7, 8, 10],
-    10: [7, 9, 11, -1, -1],
-    11: [8, 10, -1, -1, -1]
-}
-
-GAME_MAP = np.array([
-    2, 4, -1, -1, -1, -1,
-    1, 3, 5, -1, -1, -1,
-    2, 4, 5, 6, 7, -1,
-    1, 3, 7, -1, -1, -1,
-    2, 3, 8, 9, -1, -1,
-    3, 9, -1, -1, -1, -1,
-    3, 4, 9, 10, -1, -1,
-    5, 9, 11, -1, -1, -1,
-    5, 6, 7, 8, 10, -1,
-    7, 9, 11, -1, -1, -1,
-    8, 10, -1, -1, -1, -1])
-
+createOut = 0
 
 ## Main Script
 env = gym.make('everglades-v0')
@@ -79,12 +54,12 @@ class Policy(nn.Module):
         
         # fc layers to outputs
         # TODO get the proper observations space and flatten it
-        self.fc0 = nn.Linear(69, 128)
+        self.fc0 = nn.Linear(STATE_SPACE, 128)
         self.fc1 = nn.Linear(128, 64)
 		# 60 possible options for actions for our network
 		# 12 units
 		# 5 connections we can move to, 1 do nothing 
-        self.fc2 = nn.Linear(64, 72)
+        self.fc2 = nn.Linear(64, ACTION_SPACE)
         
     def forward(self, x):
         
@@ -107,12 +82,12 @@ opti = optim.Adam(policy.parameters(), lr=LEARNING_RATE)
 for episode in tqdm(range(NUM_EPISODES), ascii=True, unit="episode"):
     
     observations = env.reset(
-            players=players,        # TODO find out what to put here
+            players= ["dqn", "random"],        # TODO find out what to put here
             config_dir = config_dir,
             map_file = map_file,
             unit_file = unit_file,
             output_dir = output_dir,
-            pnames = names,
+            pnames = ["dqn", "random"],
             debug = debug,
             view = view,
             out = createOut
@@ -138,7 +113,7 @@ for episode in tqdm(range(NUM_EPISODES), ascii=True, unit="episode"):
             actionDQN[:, 1] = np.random.choice(np.arange(1, self.num_nodes + 1), self.num_actions, replace=False)
         else:
             continue
-            # action based on Qs
+            actionDQN = getActions(Q)
         
         # get random actions as our random agent
         actionRAN = np.zeros(self.shape)
@@ -199,10 +174,10 @@ def Q_to_Actions(Qs, state):
         node = state[state_index]
         
         # compare to map
-        to_node = NODE_CONNECTIONS[(node*6) + to_node]
+        move_to = NODE_CONNECTIONS[(node*6) + to_node]
         
         # append it to the array 
-        actions_for_env.append([unit, to_node])
+        actions_for_env.append([unit, move_to])
 
     return actions_for_env
     

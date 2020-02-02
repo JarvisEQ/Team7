@@ -65,6 +65,8 @@ for _ in range(5):
             view = view,
             out = createOut
     )
+	
+    print(len(observations[0]))
 
     actions = {}
 
