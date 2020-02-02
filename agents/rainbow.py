@@ -5,6 +5,14 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.autograd import Variable
 
+from torch import optim
+
+# other imports
+import os
+import numpy as np
+import math
+from __future__ import division
+
 # Hyperparameters
 LEARNING_RATE = 0.000_69
 epsilon = 0.99
@@ -14,30 +22,100 @@ TARGET_UPDATE = 10
 ACTION_SPACE = 132
 STATE_SPACE = 105
 
+BUFFER_SIZE = int(1e6)  # replay buffer size
+BATCH_SIZE = 64         # minibatch size
+TAU = 1e-3              # for soft update of target parameters
+LR = 1e-5               # learning rate
+UPDATE_EVERY = 4        # how often to update the network
 
-class rainbow:
+# this probably should probably be in a constatns file
+NODE_CONNECTIONS = {
+    1: [2, 4],
+    2: [1, 3, 5],
+    3: [2, 4, 5, 6, 7],
+    4: [1, 3, 7],
+    5: [2, 3, 8, 9],
+    6: [3, 9],
+    7: [3, 4, 9, 10],
+    8: [5, 9, 11],
+    9: [5, 6, 7, 8, 10],
+    10: [7, 9, 11],
+    11: [8, 10]
+}
+
+class RainbowAgent:
     def __init__(self):
         self.policy = policy_network()
         self.name = "Rainbow Network"
+		
+    def step(self, state, action, reward, next_state, done):
+		# code for step
+		
+    def get_action(self, state, eps=0.):
+		# get action for state
+		with torch.no_grad():
+			
+	
+	def learn(self, experiences, gamma):
+		# teaches the agent - WORK ON THIS PORTION
+		
+		# experience replay buffer must be refactored to work with
+		idxs, states, actions, returns, next_states, nonterminals, weights = experiences.sample(self.batch_size)
+		
+		# calculate current state probabilities
+		log_state_probabilities = self.online_net(states, log = True)
+		log_state_probabilities_a = log_ps[range(self.batch_size), actions]
+		
+		# get nth next state probabilities 
+		with torch.no_grad():
+			# calculate probabilities
+			prob_ns = self.online_net(next_states)
+			
+			# calculate distribution net
+			dist_ns = self.support.expand_as(prob_ns) * prob_ns
+			
+			# argmax action selection by online network
+			argmax_indices_ns = dist_ns.sum(2).argmax(1)
+			
+			# sample new target net noise
+			self.target_net.reset_noise()
+			
+			# probabilities
+			prob_target_ns = self.target_net(next_states)
+			
+			# double Q probabilities
+			prob_target_ns_a = prob_target_ns[range(self.batch_size), argmax_indices_ns]
+			
+			# compute Tz
+			Tz = returns.unsqueeze(1) + (nonterminals * (self.discount ** self.n # finish
+			
+			# compute L2 projection of Tz onto fixed support z
+			
+			# Fix disappearing probability mass when l = b = u
+	
+	def soft_update(self, local_model, target_model, tau):
+		# adsfasd
         
+# Factorized Noisy Linear w/ bias
+class NoisyLinear(nn.Module):
+	def __init__(self, in_f, out_f):
+	
+	def reset_parameters(self):
+	
+	def _scale_noise(self, size):
+	
+	def reset_noise(self):
+	
+	def forward(self, input):
+	
 
-# our magical network 
-class policy_network(nn.module):
-    
-    def __init__(self):
-        super(Policy, self).__init__()
-        
-        # fc layers to outputs
-        # TODO get the proper observations space and flatten it
-        self.fc0 = nn.Linear(STATE_SPACE, 128)
-        self.fc1 = nn.Linear(128, 64)
-        self.fc2 = nn.Linear(64, ACTION_SPACE)
-        
-    def forward(self, x):
-        
-        x = torch.flatten(x)
-        x = F.relu(self.fc0(x))
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        return x  
-    
+# Deep Q Network
+class DQN(nn.Module):
+	def __init__(self, args, action_space)::
+		
+	
+	def forward(self, x, log = False):
+		
+	
+	def reset_noise(self):
+		

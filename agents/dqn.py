@@ -364,6 +364,5 @@ def main(pub_socket=None):
     # watch_untrained_agent(env, agent)
     train_dqn(env, agent)
 
-
 if __name__ == "__main__":
     main()
