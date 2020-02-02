@@ -2,7 +2,7 @@
 import os
 import importlib
 import gym
-import gym_everglades
+from gym-everglades import gym_everglades
 import pdb
 
 import numpy as np
@@ -16,11 +16,11 @@ agent0_file = 'agents/all_cycle.py'
 #agent1_file = 'agents/same_commands.py'
 agent1_file = 'agents/random_actions.py'
 
-config_dir = './config/'
+config_dir = '/lhome/lindblot/projects/test/everglades/config/'
 map_file = config_dir + 'DemoMap.json'
 setup_file = config_dir + 'GameSetup.json'
 unit_file = config_dir + 'UnitDefinitions.json'
-output_dir = './game_telemetry/'
+output_dir = '/lhome/lindblot/projects/test/everglades/game_telemetry/'
 
 debug = 1
 
