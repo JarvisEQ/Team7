@@ -897,7 +897,7 @@ class EvergladesGame:
     def output_init(self):
         # Output telemetry files
         date = datetime.datetime.today()
-        date_frmt = date.strftime('%Y.%m.%d-%H.%M.%S')
+        date_frmt = date.strftime('%Y.%m.%d-%H.%M.%S.%f')
         self.dat_dir = self.output_dir + '/' + self.evgMap.name + '_' + date_frmt
 
         oldmask = os.umask(000)
