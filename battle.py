@@ -24,7 +24,7 @@ unit_file = config_dir + 'UnitDefinitions.json'
 output_dir = './game_telemetry/'
 
 # 0 for no debug /  1 for debug
-debug = 0
+debug = 1
 
 view = 0
 
@@ -52,36 +52,32 @@ names[0] = agent0_class.__name__
 players[1] = agent1_class(env.num_actions_per_turn, 1)
 names[1] = agent1_class.__name__
 
-for _ in range(5):
-    
-    observations = env.reset(
-            players=players,
-            config_dir = config_dir,
-            map_file = map_file,
-            unit_file = unit_file,
-            output_dir = output_dir,
-            pnames = names,
-            debug = debug,
-            view = view,
-            out = createOut
-    )
-	
-    print(len(observations[0]))
+observations = env.reset(
+        players=players,
+        config_dir = config_dir,
+        map_file = map_file,
+        unit_file = unit_file,
+        output_dir = output_dir,
+        pnames = names,
+        debug = debug,
+        view = view,
+        out = createOut
+)
 
-    actions = {}
+actions = {}
 
-    ## Game Loop
-    done = 0
-    while not done:
-        if debug:
-            env.game.debug_state()
+## Game Loop
+done = 0
+while not done:
+    if debug:
+        env.game.debug_state()
 
-        if view:
-            env.game.view_state()
+    if view:
+        env.game.view_state()
 
-        for pid in players:
-            actions[pid] = players[pid].get_action( observations[pid] )
+    for pid in players:
+        actions[pid] = players[pid].get_action( observations[pid] )
 
-        observations, reward, done, info = env.step(actions)
+    observations, reward, done, info = env.step(actions)
 
-    print(f"reward = {reward}")
+print(f"reward = {reward}")
