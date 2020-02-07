@@ -28,7 +28,7 @@ TAU = 1e-3              # for soft update of target parameters
 LR = 1e-5               # learning rate
 UPDATE_EVERY = 4        # how often to update the network
 
-# this probably should probably be in a constatns file
+# this probably should probably be in a constants file
 NODE_CONNECTIONS = {
     1: [2, 4],
     2: [1, 3, 5],
@@ -54,7 +54,7 @@ class RainbowAgent:
     def get_action(self, state, eps=0.):
 		# get action for state
 		with torch.no_grad():
-			
+			return (self.online_net(state.unsqueeze(0)) * self.support).sum(2).argmax(1).items()
 	
 	def learn(self, experiences, gamma):
 		# teaches the agent - WORK ON THIS PORTION
@@ -87,12 +87,23 @@ class RainbowAgent:
 			prob_target_ns_a = prob_target_ns[range(self.batch_size), argmax_indices_ns]
 			
 			# compute Tz
-			Tz = returns.unsqueeze(1) + (nonterminals * (self.discount ** self.n # finish
+			Tz = returns.unsqueeze(1) + (nonterminals * (self.discount ** self.n) * self.support.unsqueeze(0))
+			Tz = Tz.clamp(min = self.Vmin, max = self.Vmax)
 			
 			# compute L2 projection of Tz onto fixed support z
+			b = (Tz - self.Vmin) / self.delta_z
+			l, u = b.floor().to(torch.int64), b.ceil().to(torch.int64)
 			
-			# Fix disappearing probability mass when l = b = u
-	
+			# fix disappearing probability mass when l = b = u
+			l[(u > 0) * (l == u)] -= 1
+			u[(l < (self.atoms - 1)) * (l == u)] += 1
+			
+			# distribute probability of Tz
+			m = states.new_zeros(self.batch_size, self.atoms)
+			offset = torch.linspace(0, ((self.batch_size - 1) * self.atoms), self.batch_size).unsqueeze(1).expand(self.batch_size, self.atoms).to(actions)
+			m.view(-1).index_add_(0, (l + offset).view(-1), (
+			
+			
 	def soft_update(self, local_model, target_model, tau):
 		# adsfasd
         
@@ -113,9 +124,7 @@ class NoisyLinear(nn.Module):
 class DQN(nn.Module):
 	def __init__(self, args, action_space)::
 		
-	
 	def forward(self, x, log = False):
 		
-	
 	def reset_noise(self):
 		
