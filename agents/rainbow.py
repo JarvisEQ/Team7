@@ -63,7 +63,7 @@ class rainbow:
         self.epsilon = EPSILON
         
     # terminal_state is a bool, state is just the Qs
-    def train(self, terminal_state, state):
+    def train(self):
         
         # test to make sure we have enought replay memory to do the training
         if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
@@ -174,7 +174,7 @@ class rainbow:
             actionArray.append(action)
         
         # return the array
-        return actionArray
+        return np.array(actionArray)
         
         
 # our magical network 

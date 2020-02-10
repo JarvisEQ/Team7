@@ -103,6 +103,6 @@ for _ in range(numberOfGames):
     players[0].train()
     
     # uncomment here to update opposing player here
-    players[1].train()
+    # players[1].train()
     
     print(f"reward = {reward}")
