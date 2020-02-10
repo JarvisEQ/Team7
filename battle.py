@@ -30,7 +30,7 @@ view = 0
 
 createOut = 0
 
-numberOfGames = 5
+numberOfGames = 20
 
 ## Specific Imports
 agent0_name, agent0_extension = os.path.splitext(agent0_file)
@@ -89,7 +89,7 @@ for _ in range(numberOfGames):
         # get actions
         for pid in players:
             actions[pid] = players[pid].get_action( current_state[pid] )
-    
+        
         # TODO, find out what info is?
         new_state, reward, done, info = env.step(actions)
         
@@ -106,3 +106,6 @@ for _ in range(numberOfGames):
     # players[1].train()
     
     print(f"reward = {reward}")
+
+# finally, save the model
+model.saveModel()

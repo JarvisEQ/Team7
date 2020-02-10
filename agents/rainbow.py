@@ -32,6 +32,8 @@ REPLAY_MEMORY_SIZE = 50_000
 MIN_REPLAY_MEMORY_SIZE = 1_000
 MINIBATCH_SIZE = 50
 DISCOUNT = 0.99
+PATH = "./agents/savedModels/rainbow"
+
 
 class rainbow:
     def __init__(self):
@@ -71,11 +73,21 @@ class rainbow:
         
         minibatch = random.sample(self.replay_memory, MINIBATCH_SIZE)
         
+        # get current state and move to device
         current_state = np.array([transition[0] for transition in minibatch])/255
+        current_state = torch.tensor(current_state).double()
+        current_state.to(self.device)
+        
+        print(current_state)
+        
         current_qs_list = self.model.forward(current_state)
         
         new_current_state = np.array([transition[3] for transition in minibatch])/255
+        new_current_state = torch.tensor(new_current_state).double()
+        current_state.to(self.device)
+        
         future_qs_list = self.target_model.forward(new_current_state)
+        future_qs_list = torch.to_numpy(future_qs_list)
         
         # X and Y for optimising
         x = []
@@ -160,8 +172,10 @@ class rainbow:
             
             # convert from a tuple to a np array
             action = np.array(action)
-            action[0] += 1
-            action[1] += 1		
+            
+            # doesn't need to be incremented, causes errors
+            # action[0] += 1
+            # action[1] += 1		
 
             # check to see if the unit is already being moved
             if action[0] in units:
@@ -176,6 +190,9 @@ class rainbow:
         # return the array
         return np.array(actionArray)
         
+    # pretty self explanitory 
+    def saveModel(self):
+        torch.save(self.model.state_dict(), PATH)
         
 # our magical network 
 # TODO, probably need to make deeper and thiccer for betting results!
