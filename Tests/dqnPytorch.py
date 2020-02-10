@@ -11,7 +11,7 @@ from collections import deque
 import time
 import random
 import os
-import tqdm
+from tqdm import tqdm
 from PIL import Image
 import cv2
 
