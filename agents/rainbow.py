@@ -34,11 +34,11 @@ class ReplayBuffer:
         gamma: float = 0.99
     ):
     
-        self.obs_buf = np.zeros([size, obs_dim], dtype = np.float32)
-        self.next_obs_buf = np.zeros([size, obs_dim], dtype = np.float32)
-        self.acts_buf = np.zeros([size], dtype = np.float32)
-        self.rews_buf = np.zeros([size], dtype = np.float32)
-        self.done_buf = np.zeros(size, dtype = np.float32)
+        self.obs_buf = np.zeros([size, obs_dim], dtype = np.float)
+        self.next_obs_buf = np.zeros([size, obs_dim], dtype = np.float)
+        self.acts_buf = np.zeros([size], dtype = np.float)
+        self.rews_buf = np.zeros([size], dtype = np.float)
+        self.done_buf = np.zeros(size, dtype = np.float)
         self.max_size, self.batch_size = size, batch_size
         self.ptr, self.size, = 0, 0
         
@@ -71,7 +71,7 @@ class ReplayBuffer:
         
         obs, act = self.n_step_buffer[0][:2]
         
-        self.obs_buf[self.ptr] = obs
+        self.obs_buf[self.ptr] = obs.cpu()
         self.next_obs_buf[self.ptr] = next_obs
         self.acts_buf[self.ptr] = act
         self.rews_buf[self.ptr] = rew
@@ -402,11 +402,15 @@ class rainbow:
         n_step: int = 3,
     ):
     
-        obs_dim = env.observation_space.shape[0]
+        ##obs_dim = env.observation_space.shape[0]
         
         ##action_dim = env.action_space.n
         
-        action_dim = env.num_actions_per_turn
+        ##action_dim = env.num_actions_per_turn
+        
+        obs_dim = 105
+        
+        action_dim = 132
         
         self.env = env
         self.batch_size = batch_size
@@ -443,6 +447,7 @@ class rainbow:
         ).to(self.device)
 
         # Initialize networks
+
         self.dqn = Network(
             obs_dim, action_dim, self.atom_size, self.support
         ).to(self.device)
@@ -461,45 +466,40 @@ class rainbow:
         self.transition = list()
 
     # Get action
-    def get_action(self, state: np.ndarray) -> np.ndarray:
+    def get_action(self, state):
     
-        actions = np.zeros((7, 2))
         
-        # Noisy net
-        prioritized_actions = self.dqn(
-            torch.FloatTensor(state).to(self.device)
-        ).argsort()
+        """Select an action from the input state."""
+        # NoisyNet: no epsilon greedy action selection
         
-        selected_groups = []
+        """Qs = self.dqn(
+            torch.Tensor(state).to(self.device)
+        )
+        Qs = Qs.cpu().data.numpy()"""
         
-        for cuda_action in prioritized_actions[0]:
-            action = cuda_action.detach().cpu().numpy()
-            
-            # Get group from action
-            group = np.floor(action / 11.).astype(int)
-
-            # Get node from action
-            node = int(action % 11) + 1
-
-
-            if group not in selected_groups:
-                actions[len(selected_groups), 0] = group
-                actions[len(selected_groups), 1] = node
-                selected_groups.append(group)
-
-            if len(selected_groups) >= 7:
-                break
-                
-        self.transition = [state, actions]
-
+        state = torch.Tensor(state)
+        state = state.to(self.device)
+        
+        
+        # get Qs and turn into np array
+        Qs = self.dqn(state)
+        
+        Qs = Qs.cpu()
+        Qs = Qs.data.numpy()
+        
+        actions = self.translateQs(Qs)
+        
+        if not self.is_test:
+            self.transition = [state, actions]
+        
         return actions
 
     # Take action and return env response
-    def step(self, actions: np.ndarray) -> Tuple[np.ndarray, np.float64, bool]:
+    def step(self, actions):
     
         next_state, reward, done, _ = self.env.step(actions)
 
-        self.transition += [reward, next_state, done]
+        self.transition += [reward[0], next_state[0], done]
         
         # N-step transition
         if self.use_n_step:
@@ -554,58 +554,6 @@ class rainbow:
         self.dqn_target.reset_noise()
 
         return loss.item()
-        
-    def train(self, num_episodes: int, env, agent):
-    
-        observations = env.reset(
-                players = players,
-                config_dir = config_dir,
-                map_file = map_file,
-                unit_file = unit_file,
-                output_dir = output_dir,
-                pnames = names,
-                debug = debug,
-                view = view,
-                out = createOut
-        )
-        
-        update_cnt = 0
-        losses = []
-        scores = []
-        score = 0
-        
-        actions = {}
-
-        for ep_idx in range(1, num_episodes + 1):
-        
-            actions[0] = self.get_action( observations[0] )
-            actions[1] = players[pid].get_action( observations[1] )
-
-            observations, reward, done = self.step(actions)
-
-            score += reward
-            
-            # Increase beta
-            fraction = min(ep_idx / num_episodes, 1.0)
-            self.beta = self.beta + fraction * (1.0 - self.beta)
-
-            # When episode ends
-            if done:
-                observations = env.reset()
-                scores.append(score)
-                score = 0
-
-            # When training is ready
-            if len(self.memory) >= self.batch_size:
-                loss = self.update_model()
-                losses.append(loss)
-                update_cnt += 1
-                
-                # Hard update
-                if update_cnt % self.target_update == 0:
-                    self._target_hard_update()
-
-        self.env.close()
                 
     # Return the categorical DQN loss
     def _compute_dqn_loss(self, samples: Dict[str, np.ndarray], gamma: float) -> torch.Tensor:
@@ -657,4 +605,41 @@ class rainbow:
     # Hard update
     def _target_hard_update(self):
         self.dqn_target.load_state_dict(self.dqn.state_dict())
+        
+    
+    def translateQs(self, Qs):
+    
+        actionArray = []
+        units = []	
+        
+        # reshaping the array makes life easier
+        Qs = np.reshape(Qs, (12,11))
+
+        while len(actionArray) < 7 :
+        
+            # get the max Q
+            action = np.unravel_index(np.argmax(Qs, axis=None), Qs.shape)
+            
+            # set action low so that we do not chose it again
+            Qs[action] = float('-inf')
+            
+            # convert from a tuple to a np array
+            action = np.array(action)
+            
+            # doesn't need to be incremented, causes errors
+            # action[0] += 1
+            # action[1] += 1		
+
+            # check to see if the unit is already being moved
+            if action[0] in units:
+                continue	
+            
+            # add the unit to the unit chosen array
+            units.append(action[0])		
+
+            # append it to the action pair
+            actionArray.append(action)
+        
+        # return the array
+        return np.array(actionArray)
                 
