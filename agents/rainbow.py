@@ -642,4 +642,7 @@ class rainbow:
         
         # return the array
         return np.array(actionArray)
-                
+
+
+
+""" CURRENT AGENT ONLY COMPATIBLE WITH ACTION SPACE CONTAINING 1 ACTION, MUST BE COMPATIBLE WITH "MANY" ACTIONS """
