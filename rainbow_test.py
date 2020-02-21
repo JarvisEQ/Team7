@@ -44,7 +44,7 @@ players = {}
 names = {}
 
 # parameters for rainbow agent
-num_episodes = 2000
+num_frames = 2000
 memory_size = 1000
 batch_size = 32
 target_update = 100
@@ -54,9 +54,6 @@ names[0] = agent0_class.__name__
 
 players[1] = agent1_class(env.num_actions_per_turn, 1)
 names[1] = agent1_class.__name__
-
-## Train rainbow agent
-#players[0].train(num_episodes, env, players[1])
 
 observations = env.reset(
         players = players,
@@ -69,6 +66,76 @@ observations = env.reset(
         view = view,
         out = createOut
 )
+
+## TRAIN AGENT IN RAINBOW TEST SCRIPT
+
+"""Train the agent."""
+players[0].is_test = False
+
+state = players[0].env.reset(
+        players = players,
+        config_dir = config_dir,
+        map_file = map_file,
+        unit_file = unit_file,
+        output_dir = output_dir,
+        pnames = names,
+        debug = debug,
+        view = view,
+        out = createOut
+)
+
+update_cnt = 0
+losses = []
+scores = []
+score = 0
+
+actions = {}
+
+for frame_idx in range(1, num_frames + 1):
+    
+    for pid in players:
+        print(pid)
+        actions[pid] = players[pid].get_action( state[pid] )
+    
+    next_state, reward, done = players[0].step(actions)
+
+    state = next_state
+    score += reward[0]
+    
+    # NoisyNet: removed decrease of epsilon
+    
+    # PER: increase beta
+    fraction = min(frame_idx / num_frames, 1.0)
+    players[0].beta = players[0].beta + fraction * (1.0 - players[0].beta)
+
+    # if episode ends
+    if done:
+        state = players[0].env.reset(
+            players = players,
+            config_dir = config_dir,
+            map_file = map_file,
+            unit_file = unit_file,
+            output_dir = output_dir,
+            pnames = names,
+            debug = debug,
+            view = view,
+            out = createOut
+        )
+        scores.append(score)
+        score = 0
+
+    # if training is ready
+    if len(players[0].memory) >= players[0].batch_size:
+        loss = players[0].update_model()
+        losses.append(loss)
+        update_cnt += 1
+        
+        # if hard update is needed
+        if update_cnt % players[0].target_update == 0:
+            players[0]._target_hard_update()
+
+        
+players[0].env.close()
 
 actions = {}
 
