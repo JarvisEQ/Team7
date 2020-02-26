@@ -16,7 +16,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 # Other imports
-from .common.ReplayBuffer import ReplayBuffer
+from collections import deque
 import numpy as np
 import random 
 
@@ -57,14 +57,10 @@ class rainbow:
         self.loss = torch.nn.MSELoss()
         
         # replay memory buffer
-        self.replay_memory = ReplayBuffer(STATE_SPACE, 
-                                          ACTION_SPACE, 
-                                          REPLAY_MEMORY_SIZE, 
-                                          MINIBATCH_SIZE)
+        self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
         
         # some variables for later
-        # https://www.youtube.com/watch?v=a_Aej8hAVE4
-        self.name = "Rainbow"
+        self.name = "Rainbow Network"
         self.target_update_counter = 0
         self.epsilon = EPSILON
         
@@ -75,15 +71,15 @@ class rainbow:
         if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
             return 
         
-        sample = self.replay_memory.get_sample()
+        minibatch = random.sample(self.replay_memory, MINIBATCH_SIZE)
         
-        # move sample to device
-        state = torch.FloatTensor(sample["init_state"]).to(self.device)
-        next_state = torch.FloatTensor(sample["next_state"]).to(self.device)
-        action = torch.LongTensor(sample["action"].reshape(-1, 1)).to(self.device)
-        reward = torch.FloatTensor(sample["reward"].reshape(-1, 1)).to(self.device)
-        done = torch.FloatTensor(sample["done"].reshape(-1, 1)).to(self.device)
-
+        # get current state and move to device
+        current_state = np.array([transition[0] for transition in minibatch])/255
+        current_state = torch.tensor(current_state).double()
+        current_state.to(self.device)
+        
+        print(current_state)
+        
         current_qs_list = self.model.forward(current_state)
         
         new_current_state = np.array([transition[3] for transition in minibatch])/255
@@ -152,20 +148,10 @@ class rainbow:
         
         # make transition
         
-        return actions, Qs
+        return actions
     
-    def update_replay_memory(self, 
-                            init_state,
-                            next_state,
-                            action,
-                            reward,
-                            done):
-        
-        self.replay_memory.store_transition(init_state,
-                                            next_state,
-                                            action,
-                                            reward,
-                                            done)
+    def update_replay_memory(self, transition):
+        self.replay_memory.append(transition)
     
     # expects a numpy array of size 72 and state of size 105
     def translateQs(self, Qs):
@@ -187,6 +173,9 @@ class rainbow:
             # convert from a tuple to a np array
             action = np.array(action)
             
+            # doesn't need to be incremented, causes errors
+            # action[0] += 1
+            # action[1] += 1		
 
             # check to see if the unit is already being moved
             if action[0] in units:

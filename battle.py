@@ -71,6 +71,7 @@ for _ in range(numberOfGames):
     new_state = current_state
     
     actions = {}
+    Qs = {}
 
     # Game Loop
     # assuming only training player 0
@@ -88,16 +89,16 @@ for _ in range(numberOfGames):
         
         # get actions
         for pid in players:
-            actions[pid] = players[pid].get_action( current_state[pid] )
+            actions[pid], Qs[pid] = players[pid].get_action( current_state[pid] )
         
         # TODO, find out what info is?
         new_state, reward, done, info = env.step(actions)
         
-        # using transition for Proritized replay aspect of rainbow
-        players[0].update_replay_memory((current_state[0], actions[0], reward[0], new_state[0], done))
+        ### storing tranistions
+        players[0].update_replay_memory(current_state[0], new_state[0], Qs[0], reward[0], done)
         
         # uncomment here to add transition to opposing player here
-        # player[1].update_replay_memory(((current_state[1], actions[1], reward[1], new_state[1], done)))
+        # player[1].update_replay_memory(current_state[1], actions[1], reward[1], new_state[1], done)
     
     # trains only after game has finsihed
     players[0].train()
