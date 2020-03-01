@@ -605,11 +605,6 @@ class rainbow:
     # Hard update
     def _target_hard_update(self):
         self.dqn_target.load_state_dict(self.dqn.state_dict())
-<<<<<<< HEAD
-                
->>>>>>> 3e8a474cb6e4a462310650078af5362454c203b9
-=======
-        
     
     def translateQs(self, Qs):
     
@@ -650,4 +645,3 @@ class rainbow:
 
 
 """ CURRENT AGENT ONLY COMPATIBLE WITH ACTION SPACE CONTAINING 1 ACTION, MUST BE COMPATIBLE WITH "MANY" ACTIONS """
->>>>>>> a64730cdc57fec0043cce1d79b68029cfc6fe9cc
