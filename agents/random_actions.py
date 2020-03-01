@@ -23,6 +23,7 @@ class random_actions:
         action[:, 0] = np.random.choice(self.num_groups, self.num_actions, replace=False)
         action[:, 1] = np.random.choice(np.arange(1, self.num_nodes + 1), self.num_actions, replace=False)
         #print(action)
-        return action
+        Qs = np.zeros((132,0))
+        return action, Qs
 
 
