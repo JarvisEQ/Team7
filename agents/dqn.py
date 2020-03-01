@@ -112,11 +112,16 @@ class dqn:
 
             # not sure what np.flip does, maybe converts action values to a usable format and
             # gets the best actions (what does cpu() do?)
+            print(f"actions values {action_values}")
             prioritized_actions = np.flip(action_values.cpu().data.numpy().argsort())
+
+            print(f"p actions {prioritized_actions}")
             #print(f"prioritized actions = {prioritized_actions}\n\n")
             selected_groups = []
 
             for action in prioritized_actions[0]:
+
+                print(f"action {action}")
                 # get the group from the action
                 group = np.floor(action / 11.).astype(int)
 

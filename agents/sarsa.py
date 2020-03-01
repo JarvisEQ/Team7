@@ -1,7 +1,7 @@
 # Temporal Difference Learning
 # Kyle and Leehe
 
-class tdk:
+class sarsa:
     """Actor Critic with temporal difference learning SARSA implementation"""
 
     def __init__(self, state_size, n_actions, seed):
@@ -34,8 +34,48 @@ class tdk:
 
         return actions
 
+    def learn(self, experiences, gamma):
+        """
+        Update value parameters using given batch of experience tuples.
 
+        Params
+        ======
+            experiences (Tuple[torch.Tensor]): tuple of (s, a, r, s', done) tuples 
+            where:
+                s = current state
+                a = action
+                r = reward
+                s' = new state
+                done = ?
+
+            gamma (float): discount factor
+        """
+        print(f'learning...')
+        states, actions, rewards, next_states, dones = experiences
+
+        # Get max predicted Q values (for next states) from target model
+        # look up detach
+        Q_targets_next = self.qnetwork_target(next_states).detach().max(1)[0].unsqueeze(1)
+
+        # Compute Q targets for current states
+        Q_targets = rewards + (gamma * Q_targets_next * (1 - dones))
+
+        # Get expected Q values from local model
+        Q_expected = self.qnetwork_local(states).gather(1, actions)
+
+        # Compute loss
+        loss = F.mse_loss(Q_expected, Q_targets)
+        print(f'loss = {loss}')
+
+        # Minimize the loss
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        # ------------------- update target network ------------------- #
+        self.soft_update(self.qnetwork_local, self.qnetwork_target, TAU)
     
+
     def epsilon_greedy(epsilon, state):
         """
         Epsilon greedy policy: this implimentation was found
@@ -83,3 +123,4 @@ class QNetwork(nn.Module):
         x = F.relu(self.fc1(state))
         x = F.relu(self.fc2(x))
         return self.fc3(x)
+

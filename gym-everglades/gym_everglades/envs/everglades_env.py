@@ -48,7 +48,7 @@ class EvergladesEnv(gym.Env):
         return observations, reward, done, {}
 
     def reset(self, **kwargs):
-    # kwargs is allowed. https://github.com/openai/gym/blob/master/gym/core.py
+        # kwargs is allowed. https://github.com/openai/gym/blob/master/gym/core.py
         # Get Players
         self.players = kwargs.get('players')
         config_dir = kwargs.get('config_dir')

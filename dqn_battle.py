@@ -7,6 +7,7 @@ import pdb
 
 import numpy as np
 import random as r
+from collections import namedtuple, deque
 
 from everglades_server import server
 
@@ -52,7 +53,21 @@ names[0] = agent0_class.__name__
 players[1] = agent1_class(env.num_actions_per_turn)
 names[1] = agent1_class.__name__
 
-observations = env.reset(
+actions = {}
+
+n_episodes=2000
+max_t=200
+eps_start=1.0
+eps_end=0.01
+eps_decay=0.999
+
+scores_deque = deque(maxlen=100)   # last 100 scores
+
+eps = eps_start      
+# initialize epsilon
+
+for i_episode in range(1, n_episodes+1):
+    state = env.reset(
         players=players,
         config_dir = config_dir,
         map_file = map_file,
@@ -62,22 +77,33 @@ observations = env.reset(
         debug = debug,
         view = view,
         out = createOut
-)
+        )
+    score = 0
+    
+    for t in range(max_t):
+        actions = players[0].get_action(state, eps)
+        # print(actions)
 
-actions = {}
+        next_state, reward, done, _ = env.step(actions)
 
-## Game Loop
-done = 0
-while not done:
-    if debug:
-        env.game.debug_state()
+        # DQN step() can only train one action at a time, so step 7 times
+        for index in range(actions.shape[0]):
+            top_action = int(actions[index, 0] * 11 + actions[index, 1] - 1)
+            players[0].step(state, top_action, reward, next_state, done)
 
-    if view:
-        env.game.view_state()
+        state = next_state
+        score += reward
 
-    for pid in players:
-        actions[pid] = players[pid].get_action( observations[pid] )
+        if done:
+            break
 
-    observations, reward, done, info = env.step(actions)
+    scores_deque.append(score)       # save most recent score
+    eps = max(eps_end, eps_decay*eps)  # decrease epsilon
+    print('Episode {}\tAverage Score: {:.4f}\tEpisode Score: {:.4f}'.format(
+        i_episode, np.mean(scores_deque), score))
 
-print(f"reward = {reward}")
+    if i_episode > 100 and np.mean(scores_deque) >= 0.8:
+        print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f}'.format(
+            i_episode-100, np.mean(scores_deque)))
+        torch.save(player[0].qnetwork_local.state_dict(), 'checkpoint.pth')
+        break

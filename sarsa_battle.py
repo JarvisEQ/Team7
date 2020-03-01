@@ -15,7 +15,7 @@ EPISODES = 1
 ## Input Variables
 # Agent files must include a class of the same name with a 'get_action' function
 # Do not include './' in file path
-agent0_file = 'agents/dqn.py'
+agent0_file = 'agents/sarsa.py'
 #agent1_file = 'agents/same_commands.py'
 agent1_file = 'agents/random_actions.py'
 
@@ -60,7 +60,7 @@ names[1] = agent1_class.__name__
 
 
 # Episode loop
-for episode in EPISODES {
+for episode in range(EPISODES):
     print(f"-------------- Episode {episode} --------------\n\n")
 
     #Environment Initialization
@@ -104,11 +104,15 @@ for episode in EPISODES {
             # Q
         else:
             # Update with one step TD
-            # Q(s, a) += alpha * (reward) + (gamma * Q(observations_, actions))
+            target = reward + gamma * Q[state2, action2] 
+            mse prediction and target                                                
+            Q[state, action] = Q[state, action] + alpha * (target - Q(s, a)) 
+            Q(s, a) += alpha * (reward + (gamma * Q(observations_, actions_)) - Q(observations, actions))
+
+        observations, actions = observations_, actions_
 
         # Reward / Observations for the action
         print(f"----- Reward -----\n{reward}\n")
         print(f"-- Observations --\n{observations}\n")
 
     print(f"Reward = {reward}")
-}
