@@ -93,7 +93,7 @@ for _ in range(numberOfGames):
         
         # TODO, find out what info is?
         new_state, reward, done, info = env.step(actions)
-        
+ 
         ### storing tranistions
         players[0].update_replay_memory(current_state[0], new_state[0], Qs[0], reward[0], done)
         
@@ -109,4 +109,4 @@ for _ in range(numberOfGames):
     print(f"reward = {reward}")
 
 # finally, save the model
-model.saveModel()
+# model.saveModel()

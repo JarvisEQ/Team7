@@ -77,54 +77,40 @@ class rainbow:
         
         sample = self.replay_memory.get_sample()
         
-        # move sample to device
+        # move sample to device for increase speed
         state = torch.FloatTensor(sample["init_state"]).to(self.device)
         next_state = torch.FloatTensor(sample["next_state"]).to(self.device)
         action = torch.LongTensor(sample["action"].reshape(-1, 1)).to(self.device)
         reward = torch.FloatTensor(sample["reward"].reshape(-1, 1)).to(self.device)
         done = torch.FloatTensor(sample["done"].reshape(-1, 1)).to(self.device)
 
-        current_qs_list = self.model.forward(current_state)
+        # will be generated from our sample
+        current_qs = torch.zeros([50,132]).to(self.device)
+        expected_qs = torch.zeros([50,132]).to(self.device)
         
-        new_current_state = np.array([transition[3] for transition in minibatch])/255
-        new_current_state = torch.tensor(new_current_state).double()
-        current_state.to(self.device)
-        
-        future_qs_list = self.target_model.forward(new_current_state)
-        future_qs_list = torch.to_numpy(future_qs_list)
-        
-        # X and Y for optimising
-        x = []
-        y = []
-        
-        # go throw the mini-batch 
-        for index, (current_state, action, reward, new_current_state, done) in enumerate(minibatch):
-            if not done:
-                max_future_q = np.max(future_qs_list[index])
-                new_q = reward + DISCOUNT * max_future_q
-            else:
-                new_q = reward 
+        # find the Qs and send to our device
+        for i in range(MINIBATCH_SIZE):
             
-            current_qs = current_qs_list[index]
-            current_qs[action] = new_q
+            current_qs[i] = self.model.forward(state[i])
             
-            x.append(current_state)
-            y.append(current_qs)
+            expected_qs[i] = self.target_model(next_state[i])
+        
+    
         
         # do optimise on the minibatch
-        self.model.zerograd()
-        pred_y = self.model.forward(x)
-        loss = self.loss(pred_y, y)
-        self.opti.backward()
+        self.opti.zero_grad()
+        loss = self.loss(current_qs, expected_qs)
+        loss.backward()
         self.opti.step()
         
         # check to see if we need to update the target_model
-        if terminal_state:
-            self.target_update_counter += 1
+        self.target_update_counter += 1
             
-        if self.target_update_counter > UPDATE_TARGET_EVERY:
+        if self.target_update_counter > TARGET_UPDATE:
             self.target_model.load_state_dict(self.model.state_dict())
             self.target_update_counter = 0
+            
+            print("switching Target")
         
     def get_action(self, state):
         
@@ -138,6 +124,7 @@ class rainbow:
         Qs = Qs.data.numpy()
         
         # epsilon-greedy policy 
+		# TODO, remove when noisy is implemented
         if random.random() < self.epsilon:
             
             # random actions
