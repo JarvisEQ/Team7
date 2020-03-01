@@ -896,8 +896,14 @@ class EvergladesGame:
 
     def output_init(self):
         # Output telemetry files
+        
+        # returning here so it disables writing telemetry data
+        # it is not needed in this project, so we're saving space and time by doing this
+        # self.output = {}
+        # return
+        
         date = datetime.datetime.today()
-        date_frmt = date.strftime('%Y.%m.%d-%H.%M.%S')
+        date_frmt = date.strftime('%Y.%m.%d-%H.%M.%S.%f')
         self.dat_dir = self.output_dir + '/' + self.evgMap.name + '_' + date_frmt
 
         oldmask = os.umask(000)

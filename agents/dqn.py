@@ -16,6 +16,7 @@ TAU = 1e-3              # for soft update of target parameters
 LR = 1e-5               # learning rate
 UPDATE_EVERY = 4        # how often to update the network
 
+# this probably should probably be in a constatns file
 NODE_CONNECTIONS = {
     1: [2, 4],
     2: [1, 3, 5],
@@ -112,7 +113,7 @@ class dqn:
 
             # not sure what np.flip does, maybe converts action values to a usable format and
             # gets the best actions (what does cpu() do?)
-            prioritized_actions = np.flip(action_values.cpu().data.numpy().argsort())
+            prioritized_actions = np.flip(action_values.cpu().data.numpy().argsort(), axis=1)
             #print(f"prioritized actions = {prioritized_actions}\n\n")
             selected_groups = []
 
