@@ -32,7 +32,8 @@ REPLAY_MEMORY_SIZE = 50_000
 MIN_REPLAY_MEMORY_SIZE = 1_000
 MINIBATCH_SIZE = 50
 DISCOUNT = 0.99
-PATH = "./agents/savedModels/rainbow"
+SAVE_MODEL_EVERY = 50
+PATH = "./agents/savedModels/rainbow/rainbow_v1.weights"
 
 
 class rainbow:
@@ -66,6 +67,7 @@ class rainbow:
         # https://www.youtube.com/watch?v=a_Aej8hAVE4
         self.name = "Rainbow"
         self.target_update_counter = 0
+        self.save_model_counter = 0
         self.epsilon = EPSILON
         
     # terminal_state is a bool, state is just the Qs
@@ -95,7 +97,9 @@ class rainbow:
             
             expected_qs[i] = self.target_model(next_state[i])
         
-    
+        mask = 1 - done
+        target = (reward + DISCOUNT * expected_qs * mask).to(self.device)
+        
         
         # do optimise on the minibatch
         self.opti.zero_grad()
@@ -105,12 +109,25 @@ class rainbow:
         
         # check to see if we need to update the target_model
         self.target_update_counter += 1
-            
+        self.save_model_counter += 1
+        
+        # this is for switching target and main model
         if self.target_update_counter > TARGET_UPDATE:
+            tmp_model = self.target_model
             self.target_model.load_state_dict(self.model.state_dict())
+            self.model.load_state_dict(tmp_model.state_dict())
+            
             self.target_update_counter = 0
             
-            print("switching Target")
+        # this is saving the model 
+        if self.save_model_counter > SAVE_MODEL_EVERY:
+            self.saveModel()
+            self.save_model_counter = 0
+            
+            
+        # decay that epsilon
+        self.epsilon -= EPSILON_DECAY
+        
         
     def get_action(self, state):
         
@@ -191,6 +208,9 @@ class rainbow:
     # pretty self explanitory 
     def saveModel(self):
         torch.save(self.model.state_dict(), PATH)
+        
+    def load_model(self):
+        
         
 # our magical network 
 # TODO, probably need to make deeper and thiccer for betting results!
