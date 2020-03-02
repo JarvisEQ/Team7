@@ -16,7 +16,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 # Other imports
-from collections import deque
+from .common.ReplayBuffer import ReplayBuffer
 import numpy as np
 import random 
 
@@ -32,7 +32,8 @@ REPLAY_MEMORY_SIZE = 50_000
 MIN_REPLAY_MEMORY_SIZE = 1_000
 MINIBATCH_SIZE = 50
 DISCOUNT = 0.99
-PATH = "./agents/savedModels/rainbow"
+SAVE_MODEL_EVERY = 50
+PATH = "./agents/savedModels/rainbow/rainbow_v1.weights"
 
 
 class rainbow:
@@ -57,11 +58,16 @@ class rainbow:
         self.loss = torch.nn.MSELoss()
         
         # replay memory buffer
-        self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
+        self.replay_memory = ReplayBuffer(STATE_SPACE, 
+                                          ACTION_SPACE, 
+                                          REPLAY_MEMORY_SIZE, 
+                                          MINIBATCH_SIZE)
         
         # some variables for later
-        self.name = "Rainbow Network"
+        # https://www.youtube.com/watch?v=a_Aej8hAVE4
+        self.name = "Rainbow"
         self.target_update_counter = 0
+        self.save_model_counter = 0
         self.epsilon = EPSILON
         
     # terminal_state is a bool, state is just the Qs
@@ -71,56 +77,57 @@ class rainbow:
         if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
             return 
         
-        minibatch = random.sample(self.replay_memory, MINIBATCH_SIZE)
+        sample = self.replay_memory.get_sample()
         
-        # get current state and move to device
-        current_state = np.array([transition[0] for transition in minibatch])/255
-        current_state = torch.tensor(current_state).double()
-        current_state.to(self.device)
+        # move sample to device for increase speed
+        state = torch.FloatTensor(sample["init_state"]).to(self.device)
+        next_state = torch.FloatTensor(sample["next_state"]).to(self.device)
+        action = torch.LongTensor(sample["action"].reshape(-1, 1)).to(self.device)
+        reward = torch.FloatTensor(sample["reward"].reshape(-1, 1)).to(self.device)
+        done = torch.FloatTensor(sample["done"].reshape(-1, 1)).to(self.device)
+
+        # will be generated from our sample
+        current_qs = torch.zeros([50,132]).to(self.device)
+        expected_qs = torch.zeros([50,132]).to(self.device)
         
-        print(current_state)
-        
-        current_qs_list = self.model.forward(current_state)
-        
-        new_current_state = np.array([transition[3] for transition in minibatch])/255
-        new_current_state = torch.tensor(new_current_state).double()
-        current_state.to(self.device)
-        
-        future_qs_list = self.target_model.forward(new_current_state)
-        future_qs_list = torch.to_numpy(future_qs_list)
-        
-        # X and Y for optimising
-        x = []
-        y = []
-        
-        # go throw the mini-batch 
-        for index, (current_state, action, reward, new_current_state, done) in enumerate(minibatch):
-            if not done:
-                max_future_q = np.max(future_qs_list[index])
-                new_q = reward + DISCOUNT * max_future_q
-            else:
-                new_q = reward 
+        # find the Qs and send to our device
+        for i in range(MINIBATCH_SIZE):
             
-            current_qs = current_qs_list[index]
-            current_qs[action] = new_q
+            current_qs[i] = self.model.forward(state[i])
             
-            x.append(current_state)
-            y.append(current_qs)
+            expected_qs[i] = self.target_model(next_state[i])
+        
+        mask = 1 - done
+        target = (reward + DISCOUNT * expected_qs * mask).to(self.device)
+        
         
         # do optimise on the minibatch
-        self.model.zerograd()
-        pred_y = self.model.forward(x)
-        loss = self.loss(pred_y, y)
-        self.opti.backward()
+        self.opti.zero_grad()
+        loss = self.loss(current_qs, expected_qs)
+        loss.backward()
         self.opti.step()
         
         # check to see if we need to update the target_model
-        if terminal_state:
-            self.target_update_counter += 1
-            
-        if self.target_update_counter > UPDATE_TARGET_EVERY:
+        self.target_update_counter += 1
+        self.save_model_counter += 1
+        
+        # this is for switching target and main model
+        if self.target_update_counter > TARGET_UPDATE:
+            tmp_model = self.target_model
             self.target_model.load_state_dict(self.model.state_dict())
+            self.model.load_state_dict(tmp_model.state_dict())
+            
             self.target_update_counter = 0
+            
+        # this is saving the model 
+        if self.save_model_counter > SAVE_MODEL_EVERY:
+            self.saveModel()
+            self.save_model_counter = 0
+            
+            
+        # decay that epsilon
+        self.epsilon -= EPSILON_DECAY
+        
         
     def get_action(self, state):
         
@@ -134,6 +141,7 @@ class rainbow:
         Qs = Qs.data.numpy()
         
         # epsilon-greedy policy 
+		# TODO, remove when noisy is implemented
         if random.random() < self.epsilon:
             
             # random actions
@@ -148,10 +156,20 @@ class rainbow:
         
         # make transition
         
-        return actions
+        return actions, Qs
     
-    def update_replay_memory(self, transition):
-        self.replay_memory.append(transition)
+    def update_replay_memory(self, 
+                            init_state,
+                            next_state,
+                            action,
+                            reward,
+                            done):
+        
+        self.replay_memory.store_transition(init_state,
+                                            next_state,
+                                            action,
+                                            reward,
+                                            done)
     
     # expects a numpy array of size 72 and state of size 105
     def translateQs(self, Qs):
@@ -173,9 +191,6 @@ class rainbow:
             # convert from a tuple to a np array
             action = np.array(action)
             
-            # doesn't need to be incremented, causes errors
-            # action[0] += 1
-            # action[1] += 1		
 
             # check to see if the unit is already being moved
             if action[0] in units:
@@ -193,6 +208,9 @@ class rainbow:
     # pretty self explanitory 
     def saveModel(self):
         torch.save(self.model.state_dict(), PATH)
+        
+    def load_model(self):
+        return
         
 # our magical network 
 # TODO, probably need to make deeper and thiccer for betting results!
