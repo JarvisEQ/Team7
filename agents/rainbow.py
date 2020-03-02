@@ -208,9 +208,10 @@ class rainbow:
     # pretty self explanitory 
     def saveModel(self):
         torch.save(self.model.state_dict(), PATH)
-        
+    
+    # TODO make this a thing
     def load_model(self):
-        
+        return
         
 # our magical network 
 # TODO, probably need to make deeper and thiccer for betting results!
