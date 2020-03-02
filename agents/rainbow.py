@@ -23,8 +23,7 @@ import random
 # Hyperparameters
 LEARNING_RATE = 0.000_69
 EPSILON = 0.99
-EPSILON_DECAY = 0.000_25
-NUM_EPISODES = 5
+EPSILON_DECAY = 0.000_1
 TARGET_UPDATE = 10
 ACTION_SPACE = 132
 STATE_SPACE = 105
@@ -32,7 +31,6 @@ REPLAY_MEMORY_SIZE = 50_000
 MIN_REPLAY_MEMORY_SIZE = 1_000
 MINIBATCH_SIZE = 50
 DISCOUNT = 0.99
-SAVE_MODEL_EVERY = 50
 PATH = "./agents/savedModels/rainbow/rainbow_v1.weights"
 
 
@@ -67,11 +65,11 @@ class rainbow:
         # https://www.youtube.com/watch?v=a_Aej8hAVE4
         self.name = "Rainbow"
         self.target_update_counter = 0
-        self.save_model_counter = 0
         self.epsilon = EPSILON
+        self.win_rate = 0 
         
     # terminal_state is a bool, state is just the Qs
-    def train(self):
+    def train(self, win_rate):
         
         # test to make sure we have enought replay memory to do the training
         if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
@@ -103,27 +101,22 @@ class rainbow:
         
         # do optimise on the minibatch
         self.opti.zero_grad()
-        loss = self.loss(current_qs, expected_qs)
+        loss = self.loss(current_qs, target)
         loss.backward()
         self.opti.step()
         
         # check to see if we need to update the target_model
         self.target_update_counter += 1
-        self.save_model_counter += 1
         
-        # this is for switching target and main model
+        # updating the target model if it's time
         if self.target_update_counter > TARGET_UPDATE:
-            tmp_model = self.target_model
             self.target_model.load_state_dict(self.model.state_dict())
-            self.model.load_state_dict(tmp_model.state_dict())
-            
             self.target_update_counter = 0
             
-        # this is saving the model 
-        if self.save_model_counter > SAVE_MODEL_EVERY:
+        # only save the model if it's the best model
+        if win_rate > self.win_rate:
             self.saveModel()
-            self.save_model_counter = 0
-            
+            self.win_rate = win_rate
             
         # decay that epsilon
         self.epsilon -= EPSILON_DECAY
@@ -207,10 +200,29 @@ class rainbow:
         
     # pretty self explanitory 
     def saveModel(self):
-        torch.save(self.model.state_dict(), PATH)
+        torch.save({"model_weights": self.model.state_dict(), 
+                   "win_rate": self.win_rate,
+                   "epsilon": self.epsilon},
+                   PATH)
     
-    # TODO make this a thing
+    # grab a checkout weights, used mostly in testing 
     def load_model(self):
+        
+        checkpoint = torch.load(PATH)
+        
+        self.model.load_state_dict(checkpoint["model_weights"])
+        self.target_model.load_state_dict(checkpoint["model_weights"])
+        self.epsilon = checkpoint["epsilon"]
+        self.win_rate = checkpoint["win_rate"]
+        
+        print(f"Win rate from train is {self.win_rate}")
+        
+        return
+    
+    # this prints out helpful information for training
+    def get_debug(self):
+        print(f"epsilon = {self.epsilon}")
+        print(f"best win rate = {self.win_rate}")
         return
         
 # our magical network 
@@ -221,9 +233,9 @@ class policy_network(nn.Module):
         super(policy_network, self).__init__()
         
         # fc layers to outputs
-        self.fc0 = nn.Linear(STATE_SPACE, 128)
-        self.fc1 = nn.Linear(128, 64)
-        self.fc2 = nn.Linear(64, ACTION_SPACE)
+        self.fc0 = nn.Linear(STATE_SPACE, 512)
+        self.fc1 = nn.Linear(512, 512)
+        self.fc2 = nn.Linear(512, ACTION_SPACE)
         
     def forward(self, x):
         

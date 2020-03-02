@@ -26,6 +26,7 @@ class Stats:
     def showWinRate(self):
         print(f'Win Rate: {self.winRate}')
 
-
+    def getWinRate(self):
+        return self.winRate
     # def plotWinRate():
     #     #TODO plot win rate

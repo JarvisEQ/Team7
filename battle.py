@@ -32,7 +32,7 @@ view = 0
 
 createOut = 0
 
-numberOfGames = 20
+numberOfGames = 5_000
 
 ## Specific Imports
 agent0_name, agent0_extension = os.path.splitext(agent0_file)
@@ -57,7 +57,7 @@ players[1] = agent1_class(env.num_actions_per_turn, 1)
 names[1] = agent1_class.__name__
 
 # init stat class
-s = Stats()
+stats = Stats()
 
 
 for game in range(numberOfGames):
@@ -107,14 +107,18 @@ for game in range(numberOfGames):
         # player[1].update_replay_memory(current_state[1], actions[1], reward[1], new_state[1], done)
     
     # trains only after game has finsihed
-    players[0].train()
+    players[0].train(stats.getWinRate())
     
     # uncomment here to update opposing player here
     # players[1].train()
-
-    s.updateStats(reward[0], game+1)
-
-    s.showWinRate()
+	
+	# updating the stats if needed
+    stats.updateStats(reward[0], game+1)
+    
+    # print-out for watching training
+    print(f"Game {game}")
+    stats.showWinRate()
+    players[0].get_debug()
     print(f"reward = {reward}\n")
 
 # stat.plot
