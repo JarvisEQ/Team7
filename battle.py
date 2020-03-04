@@ -15,7 +15,7 @@ from everglades_server import server
 ## Input Variables
 # Agent files must include a class of the same name with a 'get_action' function
 # Do not include './' in file path
-agent0_file = 'agents/rainbow.py'
+agent0_file = 'agents/half_rainbow.py'
 #agent1_file = 'agents/same_commands.py'
 agent1_file = 'agents/random_actions.py'
 
@@ -32,7 +32,7 @@ view = 0
 
 createOut = 0
 
-numberOfGames = 5_000
+numberOfGames = 500_000
 
 ## Specific Imports
 agent0_name, agent0_extension = os.path.splitext(agent0_file)
