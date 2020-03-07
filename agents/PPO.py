@@ -9,6 +9,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.autograd import Variable
+from torchsummary import summary
 
 # Other imports
 from .common.ReplayBuffer import ReplayBuffer
@@ -32,7 +33,7 @@ LOSS_MIN = -1
 LOSS_MAX = 1
 
 
-PATH = "./agents/savedModels/rainbow/PPO.weights"
+PATH = "./agents/savedModels/rainbow/PPO_v1.weights"
 
 
 class half_rainbow:
@@ -219,7 +220,9 @@ class half_rainbow:
         self.target_model.load_state_dict(checkpoint["model_weights"])
         self.epsilon = checkpoint["epsilon"]
         self.win_rate = checkpoint["win_rate"]
-        
+       	
+		# show summary of model 
+ 		summary(self.model, (105, 1))
         self.get_debug()
         
         return

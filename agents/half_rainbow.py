@@ -14,6 +14,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.autograd import Variable
+from torchsummary import summary
 
 # Other imports
 from .common.ReplayBuffer import ReplayBuffer
@@ -214,7 +215,9 @@ class half_rainbow:
         self.target_model.load_state_dict(checkpoint["model_weights"])
         self.epsilon = checkpoint["epsilon"]
         self.win_rate = checkpoint["win_rate"]
-        
+		
+		# get the model summary
+        summary(self.model, (105,1)) 
         self.get_debug()
         
         return
