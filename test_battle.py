@@ -5,9 +5,9 @@ import gym
 import gym_everglades
 import pdb
 
-from tqdm import tqdm
 import numpy as np
 import random as r
+from tqdm import tqdm
 
 from everglades_server import server
 
@@ -77,8 +77,8 @@ for game in tqdm(range(numberOfGames)):
             view = view,
             out = createOut
     )
-    new_state = current_state
-    
+    new_state = current_state 
+
     actions = {}
     Qs = {}
 

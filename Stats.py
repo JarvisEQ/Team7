@@ -2,7 +2,7 @@
 import numpy as np
 from collections import deque
 
-MEMORY_SIZE = 100
+MEMORY_SIZE = 200
 
 class Stats:
     def __init__(self):

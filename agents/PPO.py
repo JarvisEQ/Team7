@@ -9,7 +9,6 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.autograd import Variable
-from torchsummary import summary
 
 # Other imports
 from .common.ReplayBuffer import ReplayBuffer
@@ -29,14 +28,14 @@ MINIBATCH_SIZE = 50
 DISCOUNT = 0.99
 
 # Unique to PPO, max and min of the loss
-LOSS_MIN = -1
-LOSS_MAX = 1
+LOSS_MIN = -0.5
+LOSS_MAX = 0.5
 
 
 PATH = "./agents/savedModels/rainbow/PPO_v1.weights"
 
 
-class half_rainbow:
+class PPO:
     def __init__(self):
         
         # initalise device 
@@ -64,8 +63,7 @@ class half_rainbow:
                                           MINIBATCH_SIZE)
         
         # some variables for later
-        # https://www.youtube.com/watch?v=a_Aej8hAVE4
-        self.name = "half_rainbow"
+        self.name = "PPO"
         self.target_update_counter = 0
         self.epsilon = EPSILON
         self.win_rate = 0 
@@ -140,7 +138,7 @@ class half_rainbow:
         Qs = Qs.data.numpy()
         
         # epsilon-greedy policy 
-		# TODO, remove when noisy is implemented
+                # TODO, remove when noisy is implemented
         if random.random() < self.epsilon:
             
             # random actions
@@ -174,7 +172,7 @@ class half_rainbow:
     def translateQs(self, Qs):
     
         actionArray = []
-        units = []	
+        units = []      
         
         # reshaping the array makes life easier
         Qs = np.reshape(Qs, (12,11))
@@ -193,10 +191,10 @@ class half_rainbow:
 
             # check to see if the unit is already being moved
             if action[0] in units:
-                continue	
+                continue        
             
             # add the unit to the unit chosen array
-            units.append(action[0])		
+            units.append(action[0])             
 
             # append it to the action pair
             actionArray.append(action)
@@ -220,9 +218,9 @@ class half_rainbow:
         self.target_model.load_state_dict(checkpoint["model_weights"])
         self.epsilon = checkpoint["epsilon"]
         self.win_rate = checkpoint["win_rate"]
-       	
-		# show summary of model 
- 		summary(self.model, (105, 1))
+        
+        # show summary of model 
+        print(self.model)
         self.get_debug()
         
         return

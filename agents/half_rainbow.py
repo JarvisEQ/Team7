@@ -14,10 +14,9 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.autograd import Variable
-from torchsummary import summary
 
 # Other imports
-from .common.ReplayBuffer import ReplayBuffer
+from .common.Prioritised_RB import Prioritised_RB
 import numpy as np
 import random 
 
@@ -32,7 +31,7 @@ REPLAY_MEMORY_SIZE = 50_000
 MIN_REPLAY_MEMORY_SIZE = 1_000
 MINIBATCH_SIZE = 50
 DISCOUNT = 0.99
-PATH = "./agents/savedModels/rainbow/half_rainbow_v3.weights"
+PATH = "./agents/savedModels/rainbow/half_rainbow_v5.weights"
 
 
 class half_rainbow:
@@ -57,10 +56,7 @@ class half_rainbow:
         self.loss = torch.nn.MSELoss()
         
         # replay memory buffer
-        self.replay_memory = ReplayBuffer(STATE_SPACE, 
-                                          ACTION_SPACE, 
-                                          REPLAY_MEMORY_SIZE, 
-                                          MINIBATCH_SIZE)
+        self.replay_memory = Prioritised_RB(REPLAY_MEMORY_SIZE)
         
         # some variables for later
         # https://www.youtube.com/watch?v=a_Aej8hAVE4
@@ -73,10 +69,14 @@ class half_rainbow:
     def train(self, win_rate):
         
         # test to make sure we have enought replay memory to do the training
-        if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
+        if self.replay_memory.get_len() < MIN_REPLAY_MEMORY_SIZE:
             return 
         
-        sample = self.replay_memory.get_sample()
+        sample = self.replay_memory.sample(MINIBATCH_SIZE)
+        
+        # TODO, fix this GARBAGE
+        # sample from Prioritised_RB tuple with dict inside, need to change stuff to make it work :)
+        print(sample)
         
         # move sample to device for increase speed
         state = torch.FloatTensor(sample["init_state"]).to(self.device)
@@ -153,17 +153,30 @@ class half_rainbow:
         return actions, Qs
     
     def update_replay_memory(self, 
-                            init_state,
-                            next_state,
-                            action,
-                            reward,
-                            done):
+                            _state,
+                            _state_next,
+                            _action,
+                            _reward,
+                            _done):
         
-        self.replay_memory.store_transition(init_state,
-                                            next_state,
-                                            action,
-                                            reward,
-                                            done)
+        # get Qs
+        current_Qs = self.model(torch.Tensor(_state).to(self.device))
+        expected_Qs = self.target_model(torch.Tensor(_state_next).to(self.device))
+        
+        target = (_reward + DISCOUNT * expected_Qs * _done).to(self.device)
+        
+        # find the error
+        error = torch.abs(current_Qs - target)
+        error = torch.max(error)
+        
+        sample = dict(init_state = _state,
+                     next_state = _state_next,
+                     action = _action,
+                     reward = _reward,
+                     done = _done)
+        
+        # store it!
+        self.replay_memory.add(error, sample)
     
     # expects a numpy array of size 72 and state of size 105
     def translateQs(self, Qs):
@@ -216,8 +229,8 @@ class half_rainbow:
         self.epsilon = checkpoint["epsilon"]
         self.win_rate = checkpoint["win_rate"]
 		
-		# get the model summary
-        summary(self.model, (105,1)) 
+	# get the model summary
+        print(self.model) 
         self.get_debug()
         
         return
@@ -238,15 +251,17 @@ class policy_network(nn.Module):
         # fc layers to outputs
         self.fc0 = nn.Linear(STATE_SPACE, 2048)
         self.fc1 = nn.Linear(2048, 2048)
-        self.fc2 = nn.Linear(2048, ACTION_SPACE)
+        self.fc2 = nn.Linear(2048, 2048)
+        self.fc3 = nn.Linear(2048, ACTION_SPACE)
         
     def forward(self, x):
         
         x = torch.flatten(x)
         x = F.relu(self.fc0(x))
         x = F.relu(self.fc1(x))
-        
+        x = F.relu(self.fc2(x))
+
         # softmax for outputs, need
-        x = F.softmax(self.fc2(x), dim=-1)
+        x = F.softmax(self.fc3(x), dim=-1)
         return x  
     
