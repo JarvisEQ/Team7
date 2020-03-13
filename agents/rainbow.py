@@ -144,7 +144,7 @@ class rainbow:
         # take the Qs and make them game-understandable
         actions = self.translateQs(Qs)
  
-        print(Qs)
+        #print(Qs)
     
         return actions, Qs
     

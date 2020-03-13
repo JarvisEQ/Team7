@@ -2,7 +2,7 @@
 import numpy as np
 from collections import deque
 
-MEMORY_SIZE = 200
+MEMORY_SIZE = 10
 
 class Stats:
     def __init__(self):
@@ -16,15 +16,15 @@ class Stats:
         self.history = deque(maxlen=MEMORY_SIZE)
 
     def updateStats(self, reward, game):
+
+        # self.history.append(reward)
         
-        self.history.append(reward)
+        # total = 0
+        # for game in self.history:
+        #     if game == 1:
+        #         total += 1 
         
-        total = 0
-        for game in self.history:
-            if game == 1:
-                total += 1 
-        
-        self.winRate = total / MEMORY_SIZE
+        # self.winRate = total / MEMORY_SIZE
 
         # set window length
         length = 10
@@ -49,7 +49,7 @@ class Stats:
         else:
             self.window.append(reward)
         
-        self.absWinRate = np.round((self.numWins / self.numGames)*100, 2)
+        self.absWinRate = np.round((self.numWins / self.numGames) * 100, 2)
         self.relWinRate = np.round(self.windowSum / length * 100, 0)
             
 
