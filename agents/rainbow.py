@@ -210,6 +210,7 @@ class rainbow:
         torch.save(self.model.state_dict(), PATH)
         
     def load_model(self):
+        return
         
         
 # our magical network 

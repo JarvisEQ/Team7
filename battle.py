@@ -28,11 +28,11 @@ output_dir = './game_telemetry/'
 # 0 for no debug /  1 for debug
 debug = 0
 
-view = 1
+view = 0
 
 createOut = 0
 
-numberOfGames = 20
+numberOfGames = 100
 
 ## Specific Imports
 agent0_name, agent0_extension = os.path.splitext(agent0_file)
@@ -50,8 +50,8 @@ names = {}
 
 # Inputs for the dqn agent are:
 # state size, actions, player #, seed
-players[0] = agent0_class(105, env.num_actions_per_turn, r.random() * 100)
-# players[0] = agent0_class()
+# players[0] = agent0_class(105, env.num_actions_per_turn, r.random() * 100)
+players[0] = agent0_class()
 names[0] = agent0_class.__name__
 
 players[1] = agent1_class(env.num_actions_per_turn)
@@ -115,7 +115,9 @@ for game in range(numberOfGames):
 
     s.updateStats(reward[0], game+1)
 
-    s.showWinRate()
+    s.showAbsWinRate()
+    s.showRelWinRate()
+    s.showNumGames()
     print(f"reward = {reward}\n")
 
 # stat.plot
