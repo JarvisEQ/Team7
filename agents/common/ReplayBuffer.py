@@ -1,5 +1,5 @@
 import numpy as np
- 
+
 # either this or use queue for the replay buffer
 # np is more efficient, thus will speed up training by a bit
 
@@ -64,3 +64,4 @@ class ReplayBuffer:
     
     def __len__(self) -> int:
         return self.size
+

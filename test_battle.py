@@ -7,13 +7,14 @@ import pdb
 
 import numpy as np
 import random as r
+from tqdm import tqdm
 
 from everglades_server import server
 
 ## Input Variables
 # Agent files must include a class of the same name with a 'get_action' function
 # Do not include './' in file path
-agent0_file = 'agents/rainbow.py'
+agent0_file = 'agents/half_rainbow.py'
 #agent1_file = 'agents/same_commands.py'
 agent1_file = 'agents/random_actions.py'
 
@@ -55,10 +56,14 @@ players[1] = agent1_class(env.num_actions_per_turn, 1)
 names[1] = agent1_class.__name__
 
 # load model
-player[0].load_model()
+players[0].load_model()
 #player[1].load_model()
 
-for game in range(numberOfGames):
+
+# will be used to measure performance
+totalWins = 0
+
+for game in tqdm(range(numberOfGames)):
     
     # get inital state
     current_state = env.reset(
@@ -72,8 +77,8 @@ for game in range(numberOfGames):
             view = view,
             out = createOut
     )
-    new_state = current_state
-    
+    new_state = current_state 
+
     actions = {}
     Qs = {}
 
@@ -98,12 +103,12 @@ for game in range(numberOfGames):
         # TODO, find out what info is?
         new_state, reward, done, info = env.step(actions)
  
-
-    # TODO 
-
+    # if the game was won
+    if reward[0] == 1:
+        totalWins += 1
     
-    print(f"reward = {reward}")
-    print(f"game {game} ")
+    
 
-# finally, save the model
-# model.saveModel()
+# what's the performance
+winRatio = totalWins / numberOfGames
+print(f"The win ratio is {winRatio}")

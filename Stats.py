@@ -1,5 +1,8 @@
 # Helps to view the battle statistics
 import numpy as np
+from collections import deque
+
+MEMORY_SIZE = 200
 
 class Stats:
     def __init__(self):
@@ -9,8 +12,20 @@ class Stats:
         self.relWinRate = 0
         self.window = []
         self.windowSum = 0
+        self.winRate = 0
+        self.history = deque(maxlen=MEMORY_SIZE)
 
     def updateStats(self, reward, game):
+        
+        self.history.append(reward)
+        
+        total = 0
+        for game in self.history:
+            if game == 1:
+                total += 1 
+        
+        self.winRate = total / MEMORY_SIZE
+
         # set window length
         length = 10
         self.numGames = game
@@ -47,7 +62,13 @@ class Stats:
     def showNumGames(self):
         print(f'Number of Games: {self.numGames}')
 
+    
 
+    def showWinRate(self):
+        print(f'Win Rate: {self.winRate}')
+
+    def getWinRate(self):
+        return self.winRate
     # def plotWinRate():
     #     #TODO plot win rate
 
