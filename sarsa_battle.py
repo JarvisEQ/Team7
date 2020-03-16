@@ -5,6 +5,8 @@ import gym
 import gym_everglades
 import pdb
 
+import torch
+
 import numpy as np
 import random as r
 
@@ -44,15 +46,13 @@ agent1_mod = importlib.import_module(agent1_name.replace('/','.'))
 agent1_class = getattr(agent1_mod, os.path.basename(agent1_name))
 
 
-
-
 ## Main Script
 env = gym.make('everglades-v0')
 players = {}
 names = {}
 
 # Initalize agents 
-players[0] = agent0_class(105, env.num_actions_per_turn, r.random() * 100)
+players[0] = agent0_class()
 names[0] = agent0_class.__name__
 
 players[1] = agent1_class(env.num_actions_per_turn)
@@ -64,7 +64,7 @@ for episode in range(EPISODES):
     print(f"-------------- Episode {episode} --------------\n\n")
 
     #Environment Initialization
-    observations = env.reset(
+    state = env.reset(
             players=players,
             config_dir = config_dir,
             map_file = map_file,
@@ -77,13 +77,14 @@ for episode in range(EPISODES):
     )
 
     actions  = {}
+    Qs = {}
     actions_ = {}
 
     # Inital actions
-    for pid in players:
-            actions[pid] = players[pid].get_action( observations[pid] )
+    actions[0], Qs[0] = players[0].get_action( state[0] )
+    actions[1], Qs[1] = players[1].get_action( state[1] )
 
-    ## Game Loop
+    # Game Loop
     done = 0
     while not done:
         if debug:
@@ -92,27 +93,25 @@ for episode in range(EPISODES):
         if view:
             env.game.view_state()
 
+
         # Take action
-        observations_, reward, done, info = env.step(actions)
+        state_, reward, done, info = env.step(actions)
 
-        # Get new actions works with random agent, but need to tweak with different agents
-        for pid in players:
-            actions_[pid] = players[pid].get_action( observations[pid] )
+        # Get new actions
+        actions_[0], Qs[0] = players[0].get_action( state_[0] )
+        actions_[1], Qs[1] = players[1].get_action( state_[1] )
+        
+        print(f'state_ \n{state_[0]}')
+        print(f'state \n{state[0]}')
+        print(f'actions \n{actions[0]}')
 
-        if done:
-            # Need to update Q network how??
-            # Q
-        else:
-            # Update with one step TD
-            target = reward + gamma * Q[state2, action2] 
-            mse prediction and target                                                
-            Q[state, action] = Q[state, action] + alpha * (target - Q(s, a)) 
-            Q(s, a) += alpha * (reward + (gamma * Q(observations_, actions_)) - Q(observations, actions))
+        # create experiences tuple
+        experiences = (torch.tensor([state[0], actions[0], reward, state_[0], done]))
 
-        observations, actions = observations_, actions_
+        # learn 
+        players[0].learn(experiences)
 
         # Reward / Observations for the action
         print(f"----- Reward -----\n{reward}\n")
-        print(f"-- Observations --\n{observations}\n")
 
     print(f"Reward = {reward}")

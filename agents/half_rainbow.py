@@ -229,7 +229,7 @@ class half_rainbow:
         self.epsilon = checkpoint["epsilon"]
         self.win_rate = checkpoint["win_rate"]
 		
-	# get the model summary
+	    # get the model summary
         print(self.model) 
         self.get_debug()
         
