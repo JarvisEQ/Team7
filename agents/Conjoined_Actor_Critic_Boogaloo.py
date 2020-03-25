@@ -1,13 +1,8 @@
-# Don't @ me, it's halfway there
-# done - Double-Q Learning
-# TODO - Pioritized Replay
-# TODO - Dueling Networks
-# TODO - Multi-step Learning (add more extra steps onto transition list)
-# done - Distributional RL
-# TODO - Nosiy Nets
-
-# with only half of the optimisations
-# used as our base-line DQN
+# Conjoined Actor Critic Boogaloo
+# thought about the idea, try to find it, don't think it's out There?
+# It takes the ideas behind Dueling DQN with having different output-streams, one for advantage and value
+# However, they are not conbined, and the training is done like a Actor-Critic model
+# No idea how this is going to turn out
 
 # torch imports
 import torch
@@ -17,7 +12,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 # Other imports
-from .common.ReplayBuffer import ReplayBuffer
+from .common.ReplayBuffer_AC import ReplayBuffer
 import numpy as np
 import random 
 
@@ -36,13 +31,13 @@ DISCOUNT = 0.99
 PATH = "./agents/savedModels/rainbow/half_rainbow_v5.weights"
 
 
-class half_rainbow:
+class Conjoined_Actor_Critic_Boogaloo:
     def __init__(self):
         
         # initalise device 
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         
-        # make main model
+        # make model
         self.model = policy_network()
         
         # make target model
@@ -55,7 +50,8 @@ class half_rainbow:
         
         # loss and optimiser
         self.opti = optim.Adam(self.model.parameters(), lr=LEARNING_RATE)
-        self.loss = torch.nn.MSELoss()
+        self.loss_actor = torch.nn.MSELoss()
+        self.loss_critic = torch.nn.MSELoss()
         
         # replay memory buffer
         self.replay_memory = ReplayBuffer(STATE_SPACE, 
@@ -64,14 +60,14 @@ class half_rainbow:
                                           MINIBATCH_SIZE)
         
         # some variables for later
-        # https://www.youtube.com/watch?v=a_Aej8hAVE4
-        self.name = "half_rainbow"
-        self.target_update_counter = 0
+        # It is a terrible name, I made this when I was high 
+        self.name = "Conjoined_Actor_Critic_Boogaloo"
         self.epsilon = EPSILON
         self.win_rate = 0 
+        self.target_update_counter = 0
         
     # terminal_state is a bool, state is just the Qs
-    def train(self, win_rate):
+    def train(self, current_win_rate, game_number):
         
         # test to make sure we have enought replay memory to do the training
         if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
@@ -84,6 +80,7 @@ class half_rainbow:
         next_state = torch.FloatTensor(sample["next_state"]).to(self.device)
         action = torch.LongTensor(sample["action"].reshape(-1, 1)).to(self.device)
         reward = torch.FloatTensor(sample["reward"].reshape(-1, 1)).to(self.device)
+        reward_critic = torch.FloatTensor(sample["reward_critic"].reshape(-1, 1)).to(self.device)
         done = torch.FloatTensor(sample["done"].reshape(-1, 1)).to(self.device)
 
         # will be generated from our sample
@@ -93,17 +90,20 @@ class half_rainbow:
         # find the Qs and send to our device
         for i in range(MINIBATCH_SIZE):
             
-            current_qs[i] = self.model.forward(state[i])
+            current_qs[i] , reward_critic[i] = self.model(state[i])
+            expected_qs[i] , _ = self.target_model(next_state[i])
             
-            expected_qs[i] = self.target_model(next_state[i])
         
-        mask = 1 - done
-        target = (reward + DISCOUNT * expected_qs * mask).to(self.device)
+        target = (reward_critic + DISCOUNT * expected_qs).to(self.device)
         
+        
+        # 
+        self.opti.zero_grad()
+        loss_actor = self.loss_actor(current_qs, target)
+        loss_critic = self.loss_critic(reward_critic, reward)
+        loss = loss_actor + loss_critic
         
         # do optimise on the minibatch
-        self.opti.zero_grad()
-        loss = self.loss(current_qs, target)
         loss.backward()
         self.opti.step()
         
@@ -116,9 +116,9 @@ class half_rainbow:
             self.target_update_counter = 0
             
         # only save the model if it's the best model
-        if win_rate > self.win_rate:
+        if current_win_rate > self.win_rate:
             self.saveModel()
-            self.win_rate = win_rate
+            self.win_rate = current_win_rate
             
         # decay that epsilon
         if self.epsilon > EPSILON_MIN:
@@ -131,10 +131,14 @@ class half_rainbow:
         state = torch.Tensor(state)
         state = state.to(self.device)
         
-        # get Qs and turn into np array
-        Qs = self.model(state)
+        # get Qs and advantage and turn into np array
+        Qs, advantage = self.model(state)
+        
         Qs = Qs.cpu()
         Qs = Qs.data.numpy()
+        
+        advantage = advantage.cpu()
+        advantage = advantage.data.numpy()
         
         # epsilon-greedy policy 
         if random.random() < self.epsilon:
@@ -151,19 +155,21 @@ class half_rainbow:
         
         # make transition
         
-        return actions, Qs
+        return actions, Qs, advantage
     
     def update_replay_memory(self, 
                             init_state,
                             next_state,
                             action,
                             reward,
+                            reward_critic,
                             done):
         
         self.replay_memory.store_transition(init_state,
                                             next_state,
                                             action,
                                             reward,
+                                            reward_critic,
                                             done)
     
     # expects a numpy array of size 72 and state of size 105
@@ -230,26 +236,40 @@ class half_rainbow:
         return
         
 # our magical network 
-# TODO, probably need to make deeper and thiccer for betting results!
 class policy_network(nn.Module):
     
     def __init__(self):
         super(policy_network, self).__init__()
         
-        # fc layers to outputs
+        # Conjoined part
         self.fc0 = nn.Linear(STATE_SPACE, 2048)
         self.fc1 = nn.Linear(2048, 2048)
-        self.fc2 = nn.Linear(2048, 2048)
-        self.fc3 = nn.Linear(2048, ACTION_SPACE)
+        
+        # Actor Part
+        self.Actor0 = nn.Linear(2048, 2048)
+        self.Actor1 = nn.Linear(2048, ACTION_SPACE)
+        
+        # Critic Part
+        self.Critic0 = nn.Linear(2048, 2048)
+        self.Critic1 = nn.Linear(2048, 1)
         
     def forward(self, x):
         
         x = torch.flatten(x)
         x = F.relu(self.fc0(x))
         x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
+        
+        action = F.relu(self.Actor0(x))
+        action = self.Actor1(action)
+        
+        reward =  F.relu(self.Critic0(x))
+        reward =  self.Critic1(reward)
 
-        # softmax for outputs, need
-        x = F.softmax(self.fc3(x), dim=-1)
-        return x  
+        # softmax for action
+        action = F.softmax(action, dim=-1)
+        
+        # Sigmoid for the Reward 
+        reward = F.sigmoid(reward)
+        
+        return action, reward
     

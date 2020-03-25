@@ -59,6 +59,9 @@ names[1] = agent1_class.__name__
 # init stat class
 stats = Stats()
 
+# load model
+# uncomment if you're starting from the begining
+# players[0].load_model()
 
 for game in range(numberOfGames):
     
@@ -106,11 +109,12 @@ for game in range(numberOfGames):
         # uncomment here to add transition to opposing player here
         # player[1].update_replay_memory(current_state[1], actions[1], reward[1], new_state[1], done)
     
-    # trains only after game has finsihed
-    players[0].train(stats.getWinRate())
-    
-    # uncomment here to update opposing player here
-    # players[1].train()
+    if (game % 4) == 0:
+        # trains only after game has finsihed
+        players[0].train(stats.getWinRate(), game)
+        
+        # uncomment here to update opposing player here
+        # players[1].train()
 	
 	# updating the stats if needed
     stats.updateStats(reward[0], game+1)
