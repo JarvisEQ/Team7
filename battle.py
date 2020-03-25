@@ -8,6 +8,8 @@ import pdb
 import numpy as np
 import random as r
 
+from Stats import Stats
+
 from everglades_server import server
 
 ## Input Variables
@@ -30,7 +32,7 @@ view = 0
 
 createOut = 0
 
-numberOfGames = 20
+numberOfGames = 500_000
 
 ## Specific Imports
 agent0_name, agent0_extension = os.path.splitext(agent0_file)
@@ -54,7 +56,11 @@ names[0] = agent0_class.__name__
 players[1] = agent1_class(env.num_actions_per_turn, 1)
 names[1] = agent1_class.__name__
 
-for _ in range(numberOfGames):
+# init stat class
+stats = Stats()
+
+
+for game in range(numberOfGames):
     
     # get inital state
     current_state = env.reset(
@@ -101,12 +107,20 @@ for _ in range(numberOfGames):
         # player[1].update_replay_memory(current_state[1], actions[1], reward[1], new_state[1], done)
     
     # trains only after game has finsihed
-    players[0].train()
+    players[0].train(stats.getWinRate())
     
     # uncomment here to update opposing player here
     # players[1].train()
+	
+	# updating the stats if needed
+    stats.updateStats(reward[0], game+1)
     
-    print(f"reward = {reward}")
+    # print-out for watching training
+    print(f"Game {game}")
+    stats.showWinRate()
+    players[0].get_debug()
+    print(f"reward = {reward}\n")
 
+# stat.plot
 # finally, save the model
 # model.saveModel()
