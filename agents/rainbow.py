@@ -27,8 +27,8 @@ EPSILON = 0.99
 EPSILON_DECAY = 0.000_02
 EPSILON_MIN = 0.3
 TARGET_UPDATE = 10
-MINIBATCH_SIZE = 32
-DISCOUNT = 0.99
+MINIBATCH_SIZE = 20
+DISCOUNT = 0.9 
 UPDATE_NOISE = 100
 
 # Environment Specifics
@@ -42,7 +42,7 @@ MIN_REPLAY_MEMORY_SIZE = 1_000
 
 
 # this is were the model will be saved
-PATH = "./agents/savedModels/rainbow/rainbow_v2.weights"
+PATH = "./agents/savedModels/rainbow/rainbow_v3.weights"
 
 
 # initalise device 
@@ -64,7 +64,8 @@ class rainbow:
         
         # loss and optimiser
         self.opti = optim.Adam(self.model.parameters(), lr=LEARNING_RATE)
-        self.loss = torch.nn.MSELoss()
+        self.loss_Qs = torch.nn.MSELoss()
+        self.loss_val = torch.nn.MSELoss()
         
         # replay memory buffer
         self.replay_memory = Prioritised_RB(STATE_SPACE, 
@@ -92,28 +93,30 @@ class rainbow:
         # move sample to device for increase speed
         state = torch.FloatTensor(sample["init_state"]).to(device)
         next_state = torch.FloatTensor(sample["next_state"]).to(device)
-        action = torch.LongTensor(sample["action"].reshape(-1, 1)).to(device)
+        # action = torch.LongTensor(sample["action"].reshape(-1, 1)).to(device)
         reward = torch.FloatTensor(sample["reward"].reshape(-1, 1)).to(device)
-        done = torch.FloatTensor(sample["done"].reshape(-1, 1)).to(device)
+        # done = torch.FloatTensor(sample["done"].reshape(-1, 1)).to(device)
 
         # will be generated from our sample
         current_qs = torch.zeros([MINIBATCH_SIZE,132]).to(device)
         expected_qs = torch.zeros([MINIBATCH_SIZE,132]).to(device)
+        reward_critic = torch.zeros([MINIBATCH_SIZE, 132]).to(device)
         
         # find the Qs and send to our device
         for i in range(MINIBATCH_SIZE):
             
-            current_qs[i] = self.model.forward(state[i])
-            
-            expected_qs[i] = self.target_model(next_state[i])
+            current_qs[i] , reward_critic[i] = self.model(state[i])
+            expected_qs[i] , _ = self.target_model(next_state[i])
         
-        mask = 1 - done
-        target = (reward + DISCOUNT * expected_qs * mask).to(device)
+        target = (expected_qs + (reward_critic * DISCOUNT)).to(device)
         
         
         # do optimise on the minibatch
         self.opti.zero_grad()
-        loss = self.loss(current_qs, target)
+        loss_Qs = self.loss_Qs(current_qs, target)
+        loss_val = self.loss_val(reward_critic, reward)
+        loss = loss_Qs + loss_val
+        
         loss.backward()
         self.opti.step()
         
@@ -146,7 +149,7 @@ class rainbow:
         state = state.to(device)
         
         # get Qs and turn into np array
-        Qs = self.model(state)
+        Qs, _ = self.model(state)
         Qs = Qs.cpu()
         Qs = Qs.data.numpy()
         
@@ -257,16 +260,16 @@ class policy_network(nn.Module):
         super(policy_network, self).__init__()
        
         # feature layers, shared by advantage and value
-        self.feat_0 = Noisy(STATE_SPACE, 2028)
-        self.feat_1 = Noisy(2028, 2028)
+        self.feat_0 = Noisy(STATE_SPACE, 3000)
+        self.feat_1 = Noisy(3000, 3000)
         
         # advantage layers
-        self.adv_0 = Noisy(2028, 2028)
-        self.adv_1 = Noisy(2028, ACTION_SPACE)
+        self.adv_0 = Noisy(3000, 3000)
+        self.adv_1 = Noisy(3000, ACTION_SPACE)
         
         # value layers
-        self.val_0 = Noisy(2028, 2028)
-        self.val_1 = Noisy(2028, ACTION_SPACE)
+        self.val_0 = Noisy(3000, 3000)
+        self.val_1 = Noisy(3000, 1)
         
     
         
@@ -286,13 +289,13 @@ class policy_network(nn.Module):
         val = F.relu(self.val_1(val))
 
         # combine advantage and value to find Qs
-        x = val * adv - adv.mean(dim = -1, keepdim=True)
+        x = adv + val - adv.mean(dim = -1, keepdim=True)
         x = torch.flatten(x)
 
         # softmax for outputs, distributional part
         x = F.softmax(x, dim = -1)
         
-        return x
+        return x, val
     
     # unique to NOISY NETS,
     # necessary so that model tries new things! 

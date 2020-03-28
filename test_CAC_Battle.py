@@ -7,6 +7,7 @@ import pdb
 
 import numpy as np
 import random as r
+from tqdm import tqdm
 
 from Stats import Stats
 
@@ -15,7 +16,7 @@ from everglades_server import server
 ## Input Variables
 # Agent files must include a class of the same name with a 'get_action' function
 # Do not include './' in file path
-agent0_file = 'agents/rainbow.py'
+agent0_file = 'agents/Conjoined_Actor_Critic_Boogaloo.py'
 #agent1_file = 'agents/same_commands.py'
 agent1_file = 'agents/random_actions.py'
 
@@ -32,7 +33,7 @@ view = 0
 
 createOut = 0
 
-numberOfGames = 500_000
+numberOfGames = 5000
 
 ## Specific Imports
 agent0_name, agent0_extension = os.path.splitext(agent0_file)
@@ -61,9 +62,12 @@ stats = Stats()
 
 # load model
 # uncomment if you're starting from the begining
-# players[0].load_model()
+players[0].load_model()
 
-for game in range(numberOfGames):
+# will be used to measure performance
+totalWins = 0
+
+for game in tqdm(range(numberOfGames)):
     
     # get inital state
     current_state = env.reset(
@@ -97,34 +101,17 @@ for game in range(numberOfGames):
         current_state = new_state
         
         # get actions
-        actions[0], Qs[0] = players[0].get_action(current_state[0])
+        actions[0], Qs[0], reward_critic = players[0].get_action(current_state[0])
         actions[1], Qs[1] = players[1].get_action(current_state[1])
-        
-        # TODO, find out what info is?
+
         new_state, reward, done, info = env.step(actions)
  
-        ### storing tranistions
-        players[0].update_replay_memory(current_state[0], new_state[0], Qs[0], reward[0], done)
-        
-        # uncomment here to add transition to opposing player here
-        # player[1].update_replay_memory(current_state[1], actions[1], reward[1], new_state[1], done)
-    
-    if (game % 1) == 0:
-        # trains only after game has finsihed
-        players[0].train(stats.getWinRate(), game)
-        
-        # uncomment here to update opposing player here
-        # players[1].train()
-	
-	# updating the stats if needed
-    stats.updateStats(reward[0], game+1)
-    
-    # print-out for watching training
-    print(f"Game {game}")
-    stats.showWinRate()
-    players[0].get_debug()
-    print(f"reward = {reward}\n")
 
-# stat.plot
-# finally, save the model
-# model.saveModel()
+
+    # if the game was won
+    if reward[0] == 1:
+        totalWins += 1	
+
+# what's the performance
+winRatio = totalWins / numberOfGames
+print(f"The win ratio is {winRatio}")

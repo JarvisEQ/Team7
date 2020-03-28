@@ -61,7 +61,7 @@ stats = Stats()
 
 # load model
 # uncomment if you're starting from the begining
-# players[0].load_model()
+players[0].load_model()
 
 for game in range(numberOfGames):
     
@@ -110,7 +110,7 @@ for game in range(numberOfGames):
     
     # trains only after game has finsihed
     players[0].train(stats.getWinRate(), game)
-        
+            
     # uncomment here to update opposing player here
     # players[1].train()
 	
