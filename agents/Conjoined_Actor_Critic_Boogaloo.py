@@ -28,7 +28,7 @@ REPLAY_MEMORY_SIZE = 50_000
 MIN_REPLAY_MEMORY_SIZE = 1_000
 MINIBATCH_SIZE = 32
 DISCOUNT = 0.99
-PATH = "./agents/savedModels/rainbow/half_rainbow_v5.weights"
+PATH = "./agents/savedModels/rainbow/CAC_v1.weights"
 
 
 class Conjoined_Actor_Critic_Boogaloo:
@@ -78,10 +78,10 @@ class Conjoined_Actor_Critic_Boogaloo:
         # move sample to device for increase speed
         state = torch.FloatTensor(sample["init_state"]).to(self.device)
         next_state = torch.FloatTensor(sample["next_state"]).to(self.device)
-        action = torch.LongTensor(sample["action"].reshape(-1, 1)).to(self.device)
+        # action = torch.LongTensor(sample["action"].reshape(-1, 1)).to(self.device)
         reward = torch.FloatTensor(sample["reward"].reshape(-1, 1)).to(self.device)
         reward_critic = torch.FloatTensor(sample["reward_critic"].reshape(-1, 1)).to(self.device)
-        done = torch.FloatTensor(sample["done"].reshape(-1, 1)).to(self.device)
+        # done = torch.FloatTensor(sample["done"].reshape(-1, 1)).to(self.device)
 
         # will be generated from our sample
         current_qs = torch.zeros([MINIBATCH_SIZE, 132]).to(self.device)
@@ -242,16 +242,16 @@ class policy_network(nn.Module):
         super(policy_network, self).__init__()
         
         # Conjoined part
-        self.fc0 = nn.Linear(STATE_SPACE, 2048)
-        self.fc1 = nn.Linear(2048, 2048)
+        self.fc0 = nn.Linear(STATE_SPACE, 4096)
+        self.fc1 = nn.Linear(4096, 4096)
         
         # Actor Part
-        self.Actor0 = nn.Linear(2048, 2048)
-        self.Actor1 = nn.Linear(2048, ACTION_SPACE)
+        self.Actor0 = nn.Linear(4096, 4096)
+        self.Actor1 = nn.Linear(4096, ACTION_SPACE)
         
         # Critic Part
-        self.Critic0 = nn.Linear(2048, 2048)
-        self.Critic1 = nn.Linear(2048, 1)
+        self.Critic0 = nn.Linear(4096, 4096)
+        self.Critic1 = nn.Linear(4096, 1)
         
     def forward(self, x):
         
@@ -269,7 +269,7 @@ class policy_network(nn.Module):
         action = F.softmax(action, dim=-1)
         
         # Sigmoid for the Reward 
-        reward = F.sigmoid(reward)
+        reward = torch.sigmoid(reward)
         
         return action, reward
     
