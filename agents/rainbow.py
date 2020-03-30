@@ -24,10 +24,10 @@ import math
 # Hyperparameters
 LEARNING_RATE = 0.000_065
 EPSILON = 0.99
-EPSILON_DECAY = 0.000_02
-EPSILON_MIN = 0.3
+EPSILON_DECAY = 0.000_01
+EPSILON_MIN = 0.25
 TARGET_UPDATE = 10
-MINIBATCH_SIZE = 20
+MINIBATCH_SIZE = 32
 DISCOUNT = 0.9 
 UPDATE_NOISE = 100
 
@@ -42,7 +42,7 @@ MIN_REPLAY_MEMORY_SIZE = 1_000
 
 
 # this is were the model will be saved
-PATH = "./agents/savedModels/rainbow/rainbow_v3.weights"
+PATH = "./agents/savedModels/rainbow/rainbow_v5.weights"
 
 
 # initalise device 
@@ -260,20 +260,28 @@ class policy_network(nn.Module):
         super(policy_network, self).__init__()
        
         # feature layers, shared by advantage and value
-        self.feat_0 = Noisy(STATE_SPACE, 3000)
-        self.feat_1 = Noisy(3000, 3000)
+        self.feat_0 = Noisy(STATE_SPACE, 2048)
+        self.feat_1 = Noisy(2048, 2048)
         
         # advantage layers
-        self.adv_0 = Noisy(3000, 3000)
-        self.adv_1 = Noisy(3000, ACTION_SPACE)
+        self.adv_0 = Noisy(2048, 2048)
+        self.adv_1 = Noisy(2048, ACTION_SPACE)
         
         # value layers
-        self.val_0 = Noisy(3000, 3000)
-        self.val_1 = Noisy(3000, 1)
+        self.val_0 = Noisy(2048, 2048)
+        self.val_1 = Noisy(2048, 1)
         
-    
+        # Critic 
+        self.Critic_0 = nn.Linear(STATE_SPACE, 2048)
+        self.Critic_1 = nn.Linear(2048, 2048)
+        self.Critic_2 = nn.Linear(2048, 1)
         
     def forward(self, x):
+        
+        # forward for critc
+        critc = F.relu(self.Critic_0(x))
+        critc = F.relu(self.Critic_1(critc))
+        critc = torch.sigmoid(self.Critic_2(critc))
         
         # forward on features 
         x = torch.flatten(x)
@@ -287,7 +295,7 @@ class policy_network(nn.Module):
         # forward for value
         val = F.relu(self.val_0(x))
         val = F.relu(self.val_1(val))
-
+        
         # combine advantage and value to find Qs
         x = adv + val - adv.mean(dim = -1, keepdim=True)
         x = torch.flatten(x)
@@ -295,7 +303,7 @@ class policy_network(nn.Module):
         # softmax for outputs, distributional part
         x = F.softmax(x, dim = -1)
         
-        return x, val
+        return x, critc
     
     # unique to NOISY NETS,
     # necessary so that model tries new things! 

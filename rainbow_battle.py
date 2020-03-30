@@ -60,8 +60,8 @@ names[1] = agent1_class.__name__
 stats = Stats()
 
 # load model
-# uncomment if you're starting from the begining
-# players[0].load_model()
+# comment if you're starting from the begining
+players[0].load_model()
 
 for game in range(numberOfGames):
     
