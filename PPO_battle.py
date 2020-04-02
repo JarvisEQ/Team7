@@ -59,6 +59,9 @@ names[1] = agent1_class.__name__
 # init stat class
 stats = Stats()
 
+# load model
+# comment if you're starting from the begining
+players[0].load_model()
 
 for game in range(numberOfGames):
     
@@ -79,6 +82,11 @@ for game in range(numberOfGames):
     actions = {}
     Qs = {}
 
+    # temp replay buffer
+    actions_rp = []
+    states_rp = []
+    reward_rp = []
+
     # Game Loop
     # assuming only training player 0
     done = False
@@ -97,24 +105,31 @@ for game in range(numberOfGames):
         for pid in players:
             actions[pid], Qs[pid] = players[pid].get_action( current_state[pid] )
         
-        # TODO, find out what info is?
-        new_state, reward, done, info = env.step(actions)
- 
-        ### storing tranistions
-        players[0].update_replay_memory(current_state[0], new_state[0], Qs[0], reward[0], done)
+        new_state, reward, done, _ = env.step(actions)
         
-        # uncomment here to add transition to opposing player here
-        # player[1].update_replay_memory(current_state[1], actions[1], reward[1], new_state[1], done)
+        # append to the temp RP
+        actions_rp.append(action_list)
+        states_rp.append(current_state[0])
+        reward_rp.append(reward[0])
+    
+    # multi-step learning, applying reward going backwards
+    for i in range(len(reward_rp), 1, -1):
+        reward_rp[i - 2] = reward_rp[i - 1] * DISCOUNT
+    
+    
+    ### storing tranistions
+    for i in range(1, len(reward_rp), 1):
+        players[0].update_replay_memory(states_rp[i], states_rp[i], actions_rp[i], reward_rp[i], done)
+    
+    # updating the stats if needed
+    stats.updateStats(reward[0], game+1)
     
     # trains only after game has finsihed
-    players[0].train(stats.getWinRate())
+    players[0].train(stats.getWinRate(), game)
     
     # uncomment here to update opposing player here
     # players[1].train()
-	
-	# updating the stats if needed
-    stats.updateStats(reward[0], game+1)
-    
+
     # print-out for watching training
     print(f"Game {game}")
     stats.showWinRate()

@@ -34,6 +34,9 @@ createOut = 0
 
 numberOfGames = 500_000
 
+# Discount factor  
+DISCOUNT = .99
+
 ## Specific Imports
 agent0_name, agent0_extension = os.path.splitext(agent0_file)
 agent0_mod = importlib.import_module(agent0_name.replace('/','.'))
@@ -59,6 +62,9 @@ names[1] = agent1_class.__name__
 # init stat class
 stats = Stats()
 
+
+
+
 # load model
 # comment if you're starting from the begining
 players[0].load_model()
@@ -81,7 +87,12 @@ for game in range(numberOfGames):
     
     actions = {}
     Qs = {}
-
+    
+    # temp replay buffer
+    actions_rp = []
+    states_rp = []
+    reward_rp = []
+    
     # Game Loop
     # assuming only training player 0
     done = False
@@ -97,27 +108,35 @@ for game in range(numberOfGames):
         current_state = new_state
         
         # get actions
-        actions[0], Qs[0] = players[0].get_action(current_state[0])
-        actions[1], Qs[1] = players[1].get_action(current_state[1])
+        actions[0], action_list = players[0].get_action(current_state[0])
+        actions[1], _ = players[1].get_action(current_state[1])
         
-        # TODO, find out what info is?
-        new_state, reward, done, info = env.step(actions)
+        # step the env
+        new_state, reward, done, _ = env.step(actions)
  
-        ### storing tranistions
-        players[0].update_replay_memory(current_state[0], new_state[0], Qs[0], reward[0], done)
+        # append to the temp RP
+        actions_rp.append(action_list)
+        states_rp.append(current_state[0])
+        reward_rp.append(reward[0])
         
-        # uncomment here to add transition to opposing player here
-        # player[1].update_replay_memory(current_state[1], actions[1], reward[1], new_state[1], done)
-    
-    if (game % 1) == 0:
-        # trains only after game has finsihed
-        players[0].train(stats.getWinRate(), game)
+
+    # trains only after game has finsihed
+    players[0].train(stats.getWinRate(), game)
         
-        # uncomment here to update opposing player here
-        # players[1].train()
+    # uncomment here to update opposing player here
+    # players[1].train()
 	
-	# updating the stats if needed
+	# updating the stats
     stats.updateStats(reward[0], game+1)
+    
+    # multi-step learning, applying reward going backwards
+    for i in range(len(reward_rp), 1, -1):
+        reward_rp[i - 2] = reward_rp[i - 1] * DISCOUNT
+    
+    
+    ### storing tranistions
+    for i in range(1, len(reward_rp), 1):
+        players[0].update_replay_memory(states_rp[i], states_rp[i], actions_rp[i], reward_rp[i], done)
     
     # print-out for watching training
     print(f"Game {game}")

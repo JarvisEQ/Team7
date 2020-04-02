@@ -1,11 +1,17 @@
-# it's almost done! 
+# it's done! 
 # done - Double-Q Learning
 # done - Pioritized Replay
 # done - Dueling Networks
-# TODO - Multi-step Learning (add more extra steps onto transition list)
+# done - Multi-step Learning 
 # done - Distributional RL
 # done - Nosiy Nets
 
+# non-standard bit,
+# critc 
+
+# name and version information
+NAME = "Rainbow"
+VERSION = 5.2
 
 # torch imports
 import torch
@@ -13,23 +19,26 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.autograd import Variable
+from torch.utils.tensorboard import SummaryWriter
 
 # Other imports
 from .common.Prioritised_RB import Prioritised_RB
+from datetime import datetime
 import numpy as np
 import random 
 import math
+import os.path
 
 
 # Hyperparameters
-LEARNING_RATE = 0.000_065
+LEARNING_RATE = 0.000_05
 EPSILON = 0.99
 EPSILON_DECAY = 0.000_01
-EPSILON_MIN = 0.25
+EPSILON_MIN = 0.20
 TARGET_UPDATE = 10
 MINIBATCH_SIZE = 32
 DISCOUNT = 0.9 
-UPDATE_NOISE = 100
+UPDATE_NOISE = 50
 
 # Environment Specifics
 STATE_SPACE = 105
@@ -40,9 +49,8 @@ ACTION_SPACE = 132
 REPLAY_MEMORY_SIZE = 50_000
 MIN_REPLAY_MEMORY_SIZE = 1_000
 
-
 # this is were the model will be saved
-PATH = "./agents/savedModels/rainbow/rainbow_v5.weights"
+PATH = f"./agents/savedModels/rainbow/{NAME}_v{VERSION}.weights"
 
 
 # initalise device 
@@ -75,11 +83,13 @@ class rainbow:
         
         # some variables for later
         # https://www.youtube.com/watch?v=a_Aej8hAVE4
-        self.name = "Rainbow"
         self.target_update_counter = 0
         self.epsilon = EPSILON
         self.win_rate = 0 
         self.noise_counter = 0
+        
+        # tensorboard writers
+        self.writer = SummaryWriter(f"runs/{NAME}_v{VERSION}_{datetime.now()}")
         
     # terminal_state is a bool, state is just the Qs
     def train(self, win_rate, game_number):
@@ -93,28 +103,31 @@ class rainbow:
         # move sample to device for increase speed
         state = torch.FloatTensor(sample["init_state"]).to(device)
         next_state = torch.FloatTensor(sample["next_state"]).to(device)
-        # action = torch.LongTensor(sample["action"].reshape(-1, 1)).to(device)
-        reward = torch.FloatTensor(sample["reward"].reshape(-1, 1)).to(device)
+        action = torch.FloatTensor(sample["action"]).to(device)
+        reward = torch.FloatTensor(sample["reward"]).to(device)
         # done = torch.FloatTensor(sample["done"].reshape(-1, 1)).to(device)
 
         # will be generated from our sample
         current_qs = torch.zeros([MINIBATCH_SIZE,132]).to(device)
         expected_qs = torch.zeros([MINIBATCH_SIZE,132]).to(device)
         reward_critic = torch.zeros([MINIBATCH_SIZE, 132]).to(device)
+        reward_expanded = torch.zeros([MINIBATCH_SIZE, 132]).to(device)
         
         # find the Qs and send to our device
         for i in range(MINIBATCH_SIZE):
             
             current_qs[i] , reward_critic[i] = self.model(state[i])
             expected_qs[i] , _ = self.target_model(next_state[i])
+            reward_expanded[i] = reward[i]
         
-        target = (expected_qs + (reward_critic * DISCOUNT)).to(device)
+        
+        target = (expected_qs + (reward_critic * action)).to(device)
         
         
         # do optimise on the minibatch
         self.opti.zero_grad()
         loss_Qs = self.loss_Qs(current_qs, target)
-        loss_val = self.loss_val(reward_critic, reward)
+        loss_val = self.loss_val(reward_critic, reward_expanded)
         loss = loss_Qs + loss_val
         
         loss.backward()
@@ -140,8 +153,19 @@ class rainbow:
         # decay that epsilon
         if self.epsilon > EPSILON_MIN:
             self.epsilon -= EPSILON_DECAY
-        
-        
+            
+        self.writer.add_scalar('Epsilon', self.epsilon, game_number)
+        self.writer.add_scalar('Win Rate/Game number', win_rate, game_number)
+        self.writer.add_scalar('Win Rate/Epsilon', win_rate, (1 - self.epsilon) * 1000)
+        self.writer.add_scalar('Best Win Rate/Game number', self.win_rate, game_number)
+        self.writer.add_scalar('Best Win Rate/Epsilon', self.win_rate, (1 - self.epsilon) * 1000)
+        self.writer.add_scalar('Loss/Game number', loss, game_number)
+        self.writer.add_scalar('Loss/Epsilon', loss, (1 - self.epsilon) * 1000)
+        self.writer.add_scalar('Reward/Game number', reward.mean(), game_number)
+        self.writer.add_scalar('Reward/Epsilon', reward.mean(), (1 - self.epsilon) * 1000)
+        self.writer.add_scalar('Reward Critic/Game number', reward_critic.mean(), game_number)
+        self.writer.add_scalar('Reward Critic/Epsilon', reward_critic.mean(), (1 - self.epsilon) * 1000)
+
     def get_action(self, state):
         
         # move state from np to Tensor and to cuda
@@ -156,20 +180,18 @@ class rainbow:
         if random.random() < self.epsilon:
             
             # random actions
-            actions = np.zeros((7, 2))
-            actions[:, 0] = np.random.choice(12, 7, replace=False)
-            actions[:, 1] = np.random.choice(11, 7, replace=False)
-        else:
+            Qs = np.random.random_sample((132))
+
             
-            # translate the Qs to action pairs
-            actions = self.translateQs(Qs)
+        # translate the Qs to action pairs
+        actions, action_list = self.translateQs(Qs)
         
         self.noise_counter += 1 
         
         if self.noise_counter == UPDATE_NOISE: 
             self.model.reset_noise()
         
-        return actions, Qs
+        return actions, action_list
     
     def update_replay_memory(self, 
                             init_state,
@@ -192,7 +214,8 @@ class rainbow:
         
         # reshaping the array makes life easier
         Qs = np.reshape(Qs, (12,11))
-
+        action_list = np.zeros([12,11])
+        
         while len(actionArray) < 7 :
         
             # get the max Q
@@ -201,9 +224,11 @@ class rainbow:
             # set action low so that we do not chose it again
             Qs[action] = float('-inf')
             
+            # set Action_list to one 
+            action_list[action] = 1
+            
             # convert from a tuple to a np array
             action = np.array(action)
-            
 
             # check to see if the unit is already being moved
             if action[0] in units:
@@ -215,8 +240,10 @@ class rainbow:
             # append it to the action pair
             actionArray.append(action)
         
+        action_list = action_list.flatten()
+        
         # return the array
-        return np.array(actionArray)
+        return np.array(actionArray), action_list
         
     # pretty self explanitory 
     def saveModel(self, game_number):
@@ -228,6 +255,11 @@ class rainbow:
     
     # grab a checkout weights, used mostly in testing 
     def load_model(self):
+        
+        # check if file exists
+        if not os.path.isfile(PATH):
+            print("No file found, new weight file created")
+            return
         
         checkpoint = torch.load(PATH)
         
@@ -260,21 +292,21 @@ class policy_network(nn.Module):
         super(policy_network, self).__init__()
        
         # feature layers, shared by advantage and value
-        self.feat_0 = Noisy(STATE_SPACE, 2048)
-        self.feat_1 = Noisy(2048, 2048)
+        self.feat_0 = Noisy(STATE_SPACE, 3000)
+        self.feat_1 = Noisy(3000, 3000)
         
         # advantage layers
-        self.adv_0 = Noisy(2048, 2048)
-        self.adv_1 = Noisy(2048, ACTION_SPACE)
+        self.adv_0 = nn.Linear(3000, 3000)
+        self.adv_1 = nn.Linear(3000, ACTION_SPACE)
         
         # value layers
-        self.val_0 = Noisy(2048, 2048)
-        self.val_1 = Noisy(2048, 1)
+        self.val_0 = nn.Linear(3000, 3000)
+        self.val_1 = nn.Linear(3000, 1)
         
         # Critic 
-        self.Critic_0 = nn.Linear(STATE_SPACE, 2048)
-        self.Critic_1 = nn.Linear(2048, 2048)
-        self.Critic_2 = nn.Linear(2048, 1)
+        self.Critic_0 = nn.Linear(STATE_SPACE, 3000)
+        self.Critic_1 = nn.Linear(3000, 3000)
+        self.Critic_2 = nn.Linear(3000, 1)
         
     def forward(self, x):
         
@@ -311,10 +343,7 @@ class policy_network(nn.Module):
         
         self.feat_0.reset_noise()
         self.feat_1.reset_noise()
-        self.adv_0.reset_noise()
-        self.adv_1.reset_noise()
-        self.val_0.reset_noise()
-        self.val_1.reset_noise()
+
         
 # trainable noisy layer
 class Noisy(nn.Linear):

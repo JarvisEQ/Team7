@@ -2,6 +2,9 @@
 # Based on the half-rainbow implementation,
 # with Loss-cliping 
 
+# name and version information
+NAME = "PPO"
+VERSION = 2
 
 # torch imports
 import torch
@@ -9,6 +12,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.autograd import Variable
+from torch.utils.tensorboard import SummaryWriter
 
 # Other imports
 from .common.ReplayBuffer import ReplayBuffer
@@ -19,6 +23,7 @@ import random
 LEARNING_RATE = 0.000_3
 EPSILON = 0.99
 EPSILON_DECAY = 0.000_01
+EPSILON_MIN = 0.10
 TARGET_UPDATE = 10
 ACTION_SPACE = 132
 STATE_SPACE = 105
@@ -28,11 +33,11 @@ MINIBATCH_SIZE = 50
 DISCOUNT = 0.99
 
 # Unique to PPO, max and min of the loss
-LOSS_MIN = -0.5
-LOSS_MAX = 0.5
+LOSS_MIN = -0.3
+LOSS_MAX = 0.3
 
 
-PATH = "./agents/savedModels/rainbow/PPO_v1.weights"
+PATH = f"./agents/savedModels/rainbow/{NAME}_v{VERSION}.weights"
 
 
 class PPO:
@@ -63,13 +68,15 @@ class PPO:
                                           MINIBATCH_SIZE)
         
         # some variables for later
-        self.name = "PPO"
         self.target_update_counter = 0
         self.epsilon = EPSILON
         self.win_rate = 0 
         
+        # tensorboard writers
+        self.writer = SummaryWriter(f"runs/{NAME}_v{VERSION}_{datetime.now()}")
+        
     # terminal_state is a bool, state is just the Qs
-    def train(self, win_rate):
+    def train(self, win_rate, game_number):
         
         # test to make sure we have enought replay memory to do the training
         if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
@@ -82,21 +89,22 @@ class PPO:
         next_state = torch.FloatTensor(sample["next_state"]).to(self.device)
         action = torch.LongTensor(sample["action"].reshape(-1, 1)).to(self.device)
         reward = torch.FloatTensor(sample["reward"].reshape(-1, 1)).to(self.device)
-        done = torch.FloatTensor(sample["done"].reshape(-1, 1)).to(self.device)
-
+        
+        
         # will be generated from our sample
-        current_qs = torch.zeros([50,132]).to(self.device)
-        expected_qs = torch.zeros([50,132]).to(self.device)
+        current_qs = torch.zeros([MINIBATCH_SIZE,132]).to(self.device)
+        expected_qs = torch.zeros([MINIBATCH_SIZE,132]).to(self.device)
+        reward_expanded = torch.zeros([MINIBATCH_SIZE,132]).to(self.device)
         
         # find the Qs and send to our device
         for i in range(MINIBATCH_SIZE):
             
             current_qs[i] = self.model.forward(state[i])
-            
             expected_qs[i] = self.target_model(next_state[i])
+            reward_expanded[i] = reward[i]
         
-        mask = 1 - done
-        target = (reward + DISCOUNT * expected_qs * mask).to(self.device)
+        
+        target = (expected_qs + (reward * action)).to(self.device)
         
         
         # do optimise on the minibatch
@@ -123,8 +131,15 @@ class PPO:
             self.win_rate = win_rate
             
         # decay that epsilon
-        self.epsilon -= EPSILON_DECAY
+        if self.epsilon > EPSILON_MIN:
+            self.epsilon -= EPSILON_DECAY
         
+        self.writer.add_scalar('Epsilon', self.epsilon, game_number)
+        self.writer.add_scalar('Win Rate', win_rate, game_number)
+        self.writer.add_scalar('Best Win Rate', self.win_rate, game_number)
+        self.writer.add_scalar('Loss', loss, game_number)
+        self.writer.add_scalar('Reward', reward.mean(), game_number)
+        self.writer.add_scalar('Reward Critic', reward_critic.mean(), game_number)
         
     def get_action(self, state):
         
@@ -138,22 +153,17 @@ class PPO:
         Qs = Qs.data.numpy()
         
         # epsilon-greedy policy 
-                # TODO, remove when noisy is implemented
         if random.random() < self.epsilon:
             
             # random actions
-            # hard-coding these in, epsilon-greedy is going to be undone in future rainbow version
-            actions = np.zeros((7, 2))
-            actions[:, 0] = np.random.choice(12, 7, replace=False)
-            actions[:, 1] = np.random.choice(11, 7, replace=False)
-        else:
+            Qs = np.random.random_sample((132))
             
-            # translate the Qs to action pairs
-            actions = self.translateQs(Qs)
+        # translate the Qs to action pairs
+        actions, action_list = self.translateQs(Qs)
         
         # make transition
         
-        return actions, Qs
+        return actions, action_list
     
     def update_replay_memory(self, 
                             init_state,
@@ -172,11 +182,12 @@ class PPO:
     def translateQs(self, Qs):
     
         actionArray = []
-        units = []      
+        units = []    
         
         # reshaping the array makes life easier
         Qs = np.reshape(Qs, (12,11))
-
+        action_list = np.zeros([12,11])
+        
         while len(actionArray) < 7 :
         
             # get the max Q
@@ -185,22 +196,26 @@ class PPO:
             # set action low so that we do not chose it again
             Qs[action] = float('-inf')
             
+            # set Action_list to one 
+            action_list[action] = 1
+            
             # convert from a tuple to a np array
             action = np.array(action)
-            
 
             # check to see if the unit is already being moved
             if action[0] in units:
-                continue        
+                continue    
             
             # add the unit to the unit chosen array
-            units.append(action[0])             
+            units.append(action[0])        
 
             # append it to the action pair
             actionArray.append(action)
         
+        action_list = action_list.flatten()
+        
         # return the array
-        return np.array(actionArray)
+        return np.array(actionArray), action_list
         
     # pretty self explanitory 
     def saveModel(self):
