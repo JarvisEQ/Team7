@@ -4,14 +4,11 @@
 # done - Dueling Networks
 # done - Multi-step Learning 
 # done - Distributional RL
-# done - Nosiy Nets
-
-# non-standard bit,
-# critc 
+# done - Noisy Nets
 
 # name and version information
 NAME = "Rainbow"
-VERSION = 5.2
+VERSION = 6.2
 
 # torch imports
 import torch
@@ -24,6 +21,7 @@ from torch.utils.tensorboard import SummaryWriter
 # Other imports
 from .common.Prioritised_RB import Prioritised_RB
 from datetime import datetime
+from torchsummary import summary 
 import numpy as np
 import random 
 import math
@@ -34,11 +32,11 @@ import os.path
 LEARNING_RATE = 0.000_05
 EPSILON = 0.99
 EPSILON_DECAY = 0.000_01
-EPSILON_MIN = 0.20
+EPSILON_MIN = 0.0
 TARGET_UPDATE = 10
-MINIBATCH_SIZE = 32
+MINIBATCH_SIZE = 64
 DISCOUNT = 0.9 
-UPDATE_NOISE = 50
+UPDATE_NOISE = 10
 
 # Environment Specifics
 STATE_SPACE = 105
@@ -50,7 +48,7 @@ REPLAY_MEMORY_SIZE = 50_000
 MIN_REPLAY_MEMORY_SIZE = 1_000
 
 # this is were the model will be saved
-PATH = f"./agents/savedModels/rainbow/{NAME}_v{VERSION}.weights"
+PATH = f"./agents/savedModels/{NAME}_v{VERSION}.weights"
 
 
 # initalise device 
@@ -110,26 +108,23 @@ class rainbow:
         # will be generated from our sample
         current_qs = torch.zeros([MINIBATCH_SIZE,132]).to(device)
         expected_qs = torch.zeros([MINIBATCH_SIZE,132]).to(device)
-        reward_critic = torch.zeros([MINIBATCH_SIZE, 132]).to(device)
+        Value = torch.zeros([MINIBATCH_SIZE, 132]).to(device)
         reward_expanded = torch.zeros([MINIBATCH_SIZE, 132]).to(device)
         
         # find the Qs and send to our device
         for i in range(MINIBATCH_SIZE):
             
-            current_qs[i] , reward_critic[i] = self.model(state[i])
-            expected_qs[i] , _ = self.target_model(next_state[i])
+            current_qs[i] = self.model(state[i])
+            expected_qs[i] = self.target_model(next_state[i])
             reward_expanded[i] = reward[i]
         
         
-        target = (expected_qs + (reward_critic * action)).to(device)
+        target = (expected_qs + (reward_expanded * action)).to(device)
         
         
         # do optimise on the minibatch
         self.opti.zero_grad()
-        loss_Qs = self.loss_Qs(current_qs, target)
-        loss_val = self.loss_val(reward_critic, reward_expanded)
-        loss = loss_Qs + loss_val
-        
+        loss = self.loss_Qs(current_qs, target)
         loss.backward()
         self.opti.step()
         
@@ -155,16 +150,11 @@ class rainbow:
             self.epsilon -= EPSILON_DECAY
             
         self.writer.add_scalar('Epsilon', self.epsilon, game_number)
-        self.writer.add_scalar('Win Rate/Game number', win_rate, game_number)
-        self.writer.add_scalar('Win Rate/Epsilon', win_rate, (1 - self.epsilon) * 1000)
-        self.writer.add_scalar('Best Win Rate/Game number', self.win_rate, game_number)
-        self.writer.add_scalar('Best Win Rate/Epsilon', self.win_rate, (1 - self.epsilon) * 1000)
-        self.writer.add_scalar('Loss/Game number', loss, game_number)
-        self.writer.add_scalar('Loss/Epsilon', loss, (1 - self.epsilon) * 1000)
-        self.writer.add_scalar('Reward/Game number', reward.mean(), game_number)
-        self.writer.add_scalar('Reward/Epsilon', reward.mean(), (1 - self.epsilon) * 1000)
-        self.writer.add_scalar('Reward Critic/Game number', reward_critic.mean(), game_number)
-        self.writer.add_scalar('Reward Critic/Epsilon', reward_critic.mean(), (1 - self.epsilon) * 1000)
+        self.writer.add_scalar('Win Rate', win_rate, game_number)
+        self.writer.add_scalar('Best Win Rate', self.win_rate, game_number)
+        self.writer.add_scalar('Loss', loss, game_number)
+        self.writer.add_scalar('Reward', reward.mean(), game_number)
+    
 
     def get_action(self, state):
         
@@ -173,7 +163,7 @@ class rainbow:
         state = state.to(device)
         
         # get Qs and turn into np array
-        Qs, _ = self.model(state)
+        Qs = self.model(state)
         Qs = Qs.cpu()
         Qs = Qs.data.numpy()
         
@@ -190,6 +180,7 @@ class rainbow:
         
         if self.noise_counter == UPDATE_NOISE: 
             self.model.reset_noise()
+            self.noise_counter = 0  
         
         return actions, action_list
     
@@ -258,7 +249,9 @@ class rainbow:
         
         # check if file exists
         if not os.path.isfile(PATH):
-            print("No file found, new weight file created")
+            print("******************************************")
+            print("* No file found, new weight file created *")
+            print("******************************************")
             return
         
         checkpoint = torch.load(PATH)
@@ -269,6 +262,8 @@ class rainbow:
         self.win_rate = checkpoint["win_rate"]
         
         game_number = checkpoint["game_number"]
+        
+        print(self.model)
         
         print(f"From Game number {game_number}")
         print(f"Win rate from train is {self.win_rate}")
@@ -292,28 +287,19 @@ class policy_network(nn.Module):
         super(policy_network, self).__init__()
        
         # feature layers, shared by advantage and value
-        self.feat_0 = Noisy(STATE_SPACE, 3000)
-        self.feat_1 = Noisy(3000, 3000)
+        self.feat_0 = Noisy(STATE_SPACE, 4096)
+        self.feat_1 = Noisy(4096, 4096)
         
         # advantage layers
-        self.adv_0 = nn.Linear(3000, 3000)
-        self.adv_1 = nn.Linear(3000, ACTION_SPACE)
+        self.adv_0 = Noisy(4096, 4096)
+        self.adv_1 = Noisy(4096, ACTION_SPACE)
         
         # value layers
-        self.val_0 = nn.Linear(3000, 3000)
-        self.val_1 = nn.Linear(3000, 1)
+        self.val_0 = Noisy(4096, 4096)
+        self.val_1 = Noisy(4096, ACTION_SPACE)
         
-        # Critic 
-        self.Critic_0 = nn.Linear(STATE_SPACE, 3000)
-        self.Critic_1 = nn.Linear(3000, 3000)
-        self.Critic_2 = nn.Linear(3000, 1)
         
     def forward(self, x):
-        
-        # forward for critc
-        critc = F.relu(self.Critic_0(x))
-        critc = F.relu(self.Critic_1(critc))
-        critc = torch.sigmoid(self.Critic_2(critc))
         
         # forward on features 
         x = torch.flatten(x)
@@ -325,17 +311,16 @@ class policy_network(nn.Module):
         adv = F.relu(self.adv_1(adv))
         
         # forward for value
-        val = F.relu(self.val_0(x))
-        val = F.relu(self.val_1(val))
+        x = F.relu(self.val_0(x))
+        x = F.relu(self.val_1(x))
         
         # combine advantage and value to find Qs
-        x = adv + val - adv.mean(dim = -1, keepdim=True)
+        x = adv + x
         x = torch.flatten(x)
 
         # softmax for outputs, distributional part
-        x = F.softmax(x, dim = -1)
-        
-        return x, critc
+        x = torch.sigmoid(x)
+        return x
     
     # unique to NOISY NETS,
     # necessary so that model tries new things! 
@@ -343,7 +328,13 @@ class policy_network(nn.Module):
         
         self.feat_0.reset_noise()
         self.feat_1.reset_noise()
-
+        
+        self.adv_0.reset_noise()
+        self.adv_1.reset_noise()
+        
+        self.val_0.reset_noise()
+        self.val_1.reset_noise()
+        
         
 # trainable noisy layer
 class Noisy(nn.Linear):
