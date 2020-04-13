@@ -9,23 +9,29 @@
 # with only half of the optimisations
 # used as our base-line DQN
 
+NAME = "Half_Rainbow"
+VERSION = 5.1
+
 # torch imports
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.autograd import Variable
+from torch.utils.tensorboard import SummaryWriter
 
 # Other imports
 from .common.ReplayBuffer import ReplayBuffer
+from datetime import datetime
 import numpy as np
 import random 
+import os.path
 
 # Hyperparameters
 LEARNING_RATE = 0.000_05
 EPSILON = 0.99
 EPSILON_DECAY = 0.000_005
-EPSILON_MIN = 0.2
+EPSILON_MIN = 0
 TARGET_UPDATE = 10
 ACTION_SPACE = 132
 STATE_SPACE = 105
@@ -33,7 +39,7 @@ REPLAY_MEMORY_SIZE = 50_000
 MIN_REPLAY_MEMORY_SIZE = 1_000
 MINIBATCH_SIZE = 32
 DISCOUNT = 0.99
-PATH = "./agents/savedModels/rainbow/half_rainbow_v5.weights"
+PATH = f"./agents/savedModels/{NAME}_v{VERSION}.weights"
 
 
 class half_rainbow:
@@ -70,8 +76,11 @@ class half_rainbow:
         self.epsilon = EPSILON
         self.win_rate = 0 
         
+        # tensorboard writers
+        self.writer = SummaryWriter(f"runs/{NAME}_v{VERSION}_{datetime.now()}")
+        
     # terminal_state is a bool, state is just the Qs
-    def train(self, win_rate):
+    def train(self, win_rate, game_number):
         
         # test to make sure we have enought replay memory to do the training
         if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
@@ -123,6 +132,12 @@ class half_rainbow:
         # decay that epsilon
         if self.epsilon > EPSILON_MIN:
             self.epsilon -= EPSILON_DECAY
+        
+        self.writer.add_scalar('Epsilon', self.epsilon, game_number)
+        self.writer.add_scalar('Win Rate', win_rate, game_number)
+        self.writer.add_scalar('Best Win Rate', self.win_rate, game_number)
+        self.writer.add_scalar('Loss', loss, game_number)
+        self.writer.add_scalar('Reward', reward.mean(), game_number)
         
         
     def get_action(self, state):
@@ -210,12 +225,29 @@ class half_rainbow:
     # grab a checkout weights, used mostly in testing 
     def load_model(self):
         
+        # check if file exists
+        if not os.path.isfile(PATH):
+            print("******************************************")
+            print("* No file found, new weight file created *")
+            print("******************************************")
+            return
+        
         checkpoint = torch.load(PATH)
         
         self.model.load_state_dict(checkpoint["model_weights"])
         self.target_model.load_state_dict(checkpoint["model_weights"])
         self.epsilon = checkpoint["epsilon"]
         self.win_rate = checkpoint["win_rate"]
+        
+        game_number = checkpoint["game_number"]
+        
+        print(self.model)
+        
+        print(f"From Game number {game_number}")
+        print(f"Win rate from train is {self.win_rate}")
+        print(f"Epsilon is {self.epsilon}")
+        
+        return
 		
 	# get the model summary
         print(self.model) 

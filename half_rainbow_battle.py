@@ -112,7 +112,7 @@ for game in range(numberOfGames):
     
     if (game % 4) == 0:
         # trains only after game has finsihed
-        players[0].train(stats.getWinRate())
+        players[0].train(stats.getWinRate(), game)
         
         # uncomment here to update opposing player here
         # players[1].train()
