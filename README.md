@@ -64,9 +64,14 @@ This file tells git to ignore compiled files and telemetry output.
 
 # How to Run
 
-### Windows
-Open an anaconda terminal
+## For Training
 
-Go to the directory with the ```test_battle.py``` file
+``` bash
+python3 {model_name}_battle.py
+```
 
-Run ```python test_battle.py```
+## For Testing
+
+``` bash
+python3 test_battle.py
+```
