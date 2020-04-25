@@ -1,21 +1,27 @@
 # Installation Instructions
 ## Dependencies
 Everglades runs in a Python3 environment. Ensure the python packages ***gym*** and ***numpy*** are installed. This can be done with:
+
 ```bash
 $ pip install numpy
 $ pip install gym
 ```
+
 If your computing environment requires it, make sure to include the --cert and --proxy flags with the pip commands.
 
 ## Installation
 From the root Everglades directory, install the Everglades environment with:
+
 ```bash
 pip install -e gym-everglades/
 ```
+
 Next, install the Everglades server with:
+
 ```bash
 pip install -e everglades-server/
 ```
+
 Finally, edit the ***test_battle.py*** script to reflect the current working environment. Update the following lines with their path in the filesystem:
 *  agent 0 file
 *  agent 1 file
