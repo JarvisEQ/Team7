@@ -5,6 +5,7 @@ Everglades runs in a Python3 environment. Ensure the python packages ***gym*** a
 ```bash
 $ pip install numpy
 $ pip install gym
+$ pip install torch
 ```
 
 If your computing environment requires it, make sure to include the --cert and --proxy flags with the pip commands.
@@ -71,6 +72,8 @@ python3 {model_name}_battle.py
 ```
 
 ## For Testing
+
+Modify the parameter 'agent0_file' to point to the model to test.
 
 ``` bash
 python3 test_battle.py
