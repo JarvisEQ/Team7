@@ -897,19 +897,21 @@ class EvergladesGame:
     def output_init(self):
         # Output telemetry files
         
+    
+        
         # returning here so it disables writing telemetry data
         # it is not needed in this project, so we're saving space and time by doing this
         # self.output = {}
         # return
         
-        date = datetime.datetime.today()
-        date_frmt = date.strftime('%Y.%m.%d-%H.%M.%S.%f')
-        self.dat_dir = self.output_dir + '/' + self.evgMap.name + '_' + date_frmt
+        #date = datetime.datetime.today()
+        #date_frmt = date.strftime('%Y.%m.%d-%H.%M.%S.%f')
+        #self.dat_dir = self.output_dir + '/' + self.evgMap.name + '_' + date_frmt
 
-        oldmask = os.umask(000)
-        os.mkdir(self.dat_dir,mode=0o777)
-        os.umask(oldmask)
-        assert( os.path.isdir(self.dat_dir) ), 'Could not create telemetry output directory'
+        #oldmask = os.umask(000)
+        #os.mkdir(self.dat_dir,mode=0o777)
+        #os.umask(oldmask)
+        #assert( os.path.isdir(self.dat_dir) ), 'Could not create telemetry output directory'
 
         self.output = {}
         hdr = '0,player1,player2,status,focus'
@@ -1088,6 +1090,9 @@ class EvergladesGame:
 
         
     def write_output(self):
+        
+        # TOO MANY BLOODY FILES!!!!
+        return
         for key in self.output.keys():
             #pdb.set_trace()
             key_dir = self.dat_dir + '/' + str(key)

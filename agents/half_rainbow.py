@@ -10,7 +10,7 @@
 # used as our base-line DQN
 
 NAME = "Half_Rainbow"
-VERSION = 5.1
+VERSION = 5.2
 
 # torch imports
 import torch
@@ -30,7 +30,7 @@ import os.path
 # Hyperparameters
 LEARNING_RATE = 0.000_05
 EPSILON = 0.99
-EPSILON_DECAY = 0.000_005
+EPSILON_DECAY = 0.000_05
 EPSILON_MIN = 0
 TARGET_UPDATE = 10
 ACTION_SPACE = 132
